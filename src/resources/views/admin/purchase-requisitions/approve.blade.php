@@ -1,0 +1,127 @@
+@extends(adminTheme() . 'layouts.app')
+
+@section('title')
+    <title>{{ websiteTitle('Approve Purchase Requisition') }}</title>
+@endsection
+
+@section('contents')
+<div class="flex-grow-1 inv-module">
+    @include('sfl-inventory::admin.partials.alerts')
+    @include('sfl-inventory::admin.partials.ui-kit')
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Approve / Reject — {{ $purchaseRequisition->requisition_no }}</h4>
+            <a href="{{ route('inventory.purchase-requisitions.index') }}" class="btn btn-sm ui-act ui-act-back" title="Back"><i class="fa-solid fa-arrow-left"></i> Back</a>
+        </div>
+        <div class="card-body">
+            <p>
+                <strong>Department:</strong> {{ $purchaseRequisition->department?->name ?? '—' }} &nbsp;|&nbsp;
+                <strong>Date:</strong> {{ $purchaseRequisition->requisition_date?->format('d M Y') }}
+            </p>
+
+            <form method="POST" action="{{ route('inventory.purchase-requisitions.approval', $purchaseRequisition) }}">
+                @csrf
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <p class="text-muted mb-0" style="font-size:12px;">Adjust an Approved Qty to edit a line, remove (✕) an item you don't want to purchase, or add a new item the requester didn't originally ask for. Removed items are left out of the auto-created Store Order.</p>
+                    <button type="button" class="btn btn-sm ui-act ui-act-create" data-line-items-add="preqApprove" title="Add Item"><i class="fa-solid fa-plus"></i> Add Item</button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm align-middle">
+                        <thead><tr><th>Item</th><th style="width:140px">Color</th><th style="width:140px">Size</th><th>Requested Qty</th><th style="width:160px">Approved Qty</th><th style="width:150px">Estimated Rate</th><th style="width:130px">Est. Amount</th><th style="width:40px"></th></tr></thead>
+                        <tbody id="preqApproveRowsBody">
+                            @foreach($purchaseRequisition->items as $item)
+                                <tr>
+                                    <td>{{ $item->item?->item_code }} — {{ $item->item?->item_name }}</td>
+                                    <td>{{ $item->color?->name ?? '—' }}</td>
+                                    <td>{{ $item->size?->name ?? '—' }}</td>
+                                    <td>{{ inv_qty($item->requested_qty) }}</td>
+                                    <td>
+                                        <input type="hidden" name="items[{{ $loop->index }}][id]" value="{{ $item->id }}">
+                                        <input type="number" step="0.0001" min="0" class="form-control form-control-sm" data-role="qty"
+                                            name="items[{{ $loop->index }}][approved_qty]" value="{{ $item->requested_qty + 0 }}">
+                                    </td>
+                                    <td><input type="number" step="0.01" min="0" class="form-control form-control-sm" data-role="rate" name="items[{{ $loop->index }}][estimated_rate]" value="{{ $item->estimated_rate }}" placeholder="Tk"></td>
+                                    <td><input type="text" class="form-control form-control-sm text-right" data-role="amount" value="{{ number_format((float) $item->requested_qty * (float) $item->estimated_rate, 2, '.', '') }}" readonly tabindex="-1"></td>
+                                    <td><button type="button" class="btn-custom ui-act ui-act-delete" data-line-items-remove title="Remove — don't purchase this item"><i class="fa-solid fa-trash"></i></button></td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                        <tfoot>
+                            <tr class="font-weight-bold">
+                                <td colspan="6" class="text-right">Estimated Total (Tk) — requested: {{ number_format($purchaseRequisition->estimated_total, 2) }} / approving:</td>
+                                <td><input type="text" id="preqApproveTotal" class="form-control form-control-sm text-right font-weight-bold" readonly tabindex="-1"></td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <template id="preqApproveRowTemplate">
+                    <tr>
+                        <td>
+                            <select name="items[__INDEX__][item_id]" class="form-control form-control-sm inv-select2" required>
+                                <option value="">— Select —</option>
+                                @foreach($items as $item)
+                                    <option value="{{ $item->id }}" data-color-id="{{ $item->color_id }}" data-size-id="{{ $item->size_id }}">{{ $item->item_code }} — {{ $item->item_name }}</option>
+                                @endforeach
+                            </select>
+                        </td>
+                        <td>
+                            <select name="items[__INDEX__][color_id]" class="form-control form-control-sm">
+                                <option value="">— Select —</option>
+                                @foreach($colors as $color)
+                                    <option value="{{ $color->id }}">{{ $color->name }}</option>
+                                @endforeach
+                            </select>
+                        </td>
+                        <td>
+                            <select name="items[__INDEX__][size_id]" class="form-control form-control-sm">
+                                <option value="">— Select —</option>
+                                @foreach($sizes as $size)
+                                    <option value="{{ $size->id }}">{{ $size->name }}</option>
+                                @endforeach
+                            </select>
+                        </td>
+                        <td class="text-muted">— (new) —</td>
+                        <td><input type="number" step="0.0001" min="0.0001" class="form-control form-control-sm" data-role="qty" name="items[__INDEX__][approved_qty]" required></td>
+                        <td><input type="number" step="0.01" min="0.01" class="form-control form-control-sm" data-role="rate" name="items[__INDEX__][estimated_rate]" placeholder="Tk" required></td>
+                        <td><input type="text" class="form-control form-control-sm text-right" data-role="amount" readonly tabindex="-1"></td>
+                        <td><button type="button" class="btn-custom ui-act ui-act-delete" data-line-items-remove title="Delete"><i class="fa-solid fa-trash"></i></button></td>
+                    </tr>
+                </template>
+
+                <div class="mb-3">
+                    <label class="form-label">Remarks</label>
+                    <textarea name="approval_remarks" class="form-control form-control-sm" rows="2"></textarea>
+                </div>
+
+                <button type="submit" name="decision" value="approve" class="btn btn-sm ui-act ui-act-approve" title="Approve"><i class="fa-solid fa-check"></i> Approve</button>
+                <button type="submit" name="decision" value="reject" class="btn btn-sm ui-act ui-act-reject" onclick="return confirm('Reject this purchase requisition?')" title="Reject"><i class="fa-solid fa-xmark"></i> Reject</button>
+                <a href="{{ route('inventory.purchase-requisitions.index') }}" class="btn btn-sm ui-act ui-act-cancel" title="Cancel"><i class="fa-solid fa-ban"></i> Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+@include('sfl-inventory::admin.partials.select2-init')
+@include('sfl-inventory::admin.partials.line-items-script')
+@push('js')
+<script>
+    (function () {
+        const body = document.getElementById('preqApproveRowsBody');
+        const total = document.getElementById('preqApproveTotal');
+        function refresh() {
+            let sum = 0;
+            body.querySelectorAll('tr').forEach(function (row) {
+                sum += parseFloat(row.querySelector('[data-role="qty"]')?.value || 0) * parseFloat(row.querySelector('[data-role="rate"]')?.value || 0);
+            });
+            total.value = sum.toFixed(2);
+        }
+        body.addEventListener('input', refresh);
+        body.addEventListener('click', function () { setTimeout(refresh, 0); });
+        document.querySelector('[data-line-items-add="preqApprove"]')?.addEventListener('click', function () { setTimeout(refresh, 0); });
+        refresh();
+    })();
+</script>
+@endpush
+@endsection

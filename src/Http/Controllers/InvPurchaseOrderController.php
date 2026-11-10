@@ -1,0 +1,272 @@
+<?php
+
+namespace ME\SflInventory\Http\Controllers;
+
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
+use ME\SflInventory\Http\Requests\InvPurchaseOrderRequest;
+use ME\SflInventory\Models\InvItem;
+use ME\SflInventory\Models\InvPurchaseOrder;
+use ME\SflInventory\Models\InvPurchaseRequisition;
+use ME\SflInventory\Models\InvPurchaseRequisitionItem;
+use ME\SflInventory\Models\InvStore;
+use ME\SflInventory\Models\InvSupplier;
+use ME\SflInventory\Services\InvOperatorScopeService;
+
+class InvPurchaseOrderController extends Controller
+{
+    public function __construct(private readonly InvOperatorScopeService $operatorScope)
+    {
+    }
+
+    public function index(Request $request): View
+    {
+        $this->authorize('inv_purchase_order.list');
+
+        $purchaseOrdersQuery = InvPurchaseOrder::query()
+            ->with(['supplier', 'creator', 'purchaseRequisition'])
+            ->withCount(['grns', 'items'])
+            ->when($request->filled('search'), fn ($q) => $q->where('po_number', 'like', '%' . $request->search . '%'))
+            ->when($request->filled('supplier_id'), fn ($q) => $q->where('supplier_id', $request->supplier_id))
+            ->when($request->filled('item_id'), fn ($q) => $q->whereHas('items', fn ($iq) => $iq->where('item_id', $request->item_id)))
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
+            ->when($request->filled('date_from'), fn ($q) => $q->whereDate('order_date', '>=', $request->date_from))
+            ->when($request->filled('date_to'), fn ($q) => $q->whereDate('order_date', '<=', $request->date_to))
+            ->tap(fn ($q) => $this->operatorScope->applyToActor($q, 'created_by'));
+
+        $grandTotal = (float) (clone $purchaseOrdersQuery)->sum('total_amount');
+
+        $purchaseOrders = $purchaseOrdersQuery
+            ->latest('id')
+            ->paginate(20)
+            ->withQueryString();
+
+        $suppliers = InvSupplier::active()->orderBy('name')->get();
+        $items = InvItem::active()->orderBy('item_name')->get();
+
+        $trashedPurchaseOrders = InvPurchaseOrder::onlyTrashed()->with('supplier')->latest('deleted_at')->get()
+            ->map(fn ($po) => ['id' => $po->id, 'title' => $po->po_number, 'subtitle' => $po->supplier?->name, 'deleted_at' => $po->deleted_at]);
+
+        return view('sfl-inventory::admin.purchase-orders.index', compact('purchaseOrders', 'suppliers', 'items', 'trashedPurchaseOrders', 'grandTotal'));
+    }
+
+    /**
+     * Direct/manual Purchase Order creation is disabled — every order must
+     * be raised against an approved (or partially converted) Purchase
+     * Requisition, mirroring how Issue requires an approved Requisition.
+     * No ?purchase_requisition_id= yet: stay on this same page and show a
+     * picker instead of bouncing to the Purchase Requisitions list — picking
+     * one just reloads this page with the id set.
+     */
+    public function create(Request $request): View
+    {
+        $this->authorize('inv_purchase_order.add');
+
+        $purchaseRequisition = InvPurchaseRequisition::with('items.item.unit', 'items.color', 'items.size')
+            ->whereIn('status', ['approved', 'partially_converted'])
+            ->find($request->purchase_requisition_id);
+
+        return view('sfl-inventory::admin.purchase-orders.create', [
+            'purchaseRequisition'  => $purchaseRequisition,
+            'purchaseRequisitions' => $purchaseRequisition ? collect() : InvPurchaseRequisition::whereIn('status', ['approved', 'partially_converted'])->orderByDesc('id')->get(),
+            'suppliers'            => InvSupplier::active()->orderBy('name')->get(),
+        ]);
+    }
+
+    public function store(InvPurchaseOrderRequest $request): RedirectResponse
+    {
+        $data = $request->validated();
+
+        $purchaseRequisition = InvPurchaseRequisition::find($data['purchase_requisition_id']);
+
+        $po = DB::transaction(function () use ($data) {
+            // Price isn't collected here anymore — see InvPurchaseOrderRequest —
+            // so this total is 0 until GRN receipts price the order line by line.
+            $total = collect($data['items'])->sum(fn ($line) => $line['quantity'] * ($line['rate'] ?? 0));
+
+            $po = InvPurchaseOrder::create([
+                'purchase_requisition_id' => $data['purchase_requisition_id'],
+                'supplier_id'   => $data['supplier_id'],
+                'order_date'    => $data['order_date'],
+                'expected_date' => $data['expected_date'] ?? null,
+                // Admin Approval already happened once, upstream, on the
+                // Purchase Requisition — a Purchase Order raised against an
+                // approved requisition doesn't need its own second approval
+                // gate (the diagrammed flow has exactly one approval box
+                // between Requisition and Purchase Order). approve() below
+                // is kept only so a pre-existing 'draft' PO from before this
+                // change isn't stranded without a way forward.
+                'status'        => 'approved',
+                'total_amount'  => $total,
+                'remarks'       => $data['remarks'] ?? null,
+                'created_by'    => auth()->id(),
+            ]);
+
+            foreach ($data['items'] as $line) {
+                // Color/Size are never re-picked here — they're inherited
+                // straight from the requisition line that was already
+                // approved, so a Store Order can never drift to a different
+                // variant than what Admin Approval actually signed off on.
+                $requisitionItem = ! empty($line['purchase_requisition_item_id'])
+                    ? InvPurchaseRequisitionItem::find($line['purchase_requisition_item_id'])
+                    : null;
+
+                $po->items()->create([
+                    'item_id'  => $line['item_id'],
+                    'color_id' => $requisitionItem?->color_id,
+                    'size_id'  => $requisitionItem?->size_id,
+                    'quantity' => $line['quantity'],
+                    'rate'     => $line['rate'] ?? 0,
+                    'amount'   => $line['quantity'] * ($line['rate'] ?? 0),
+                ]);
+
+                $requisitionItem?->increment('converted_qty', $line['quantity']);
+            }
+
+            return $po;
+        });
+
+        $purchaseRequisition?->refreshConversionStatus();
+
+        return redirect()->route('inventory.purchase-orders.index')->with('success', "Purchase order {$po->po_number} created successfully.");
+    }
+
+    public function show(InvPurchaseOrder $purchase_order): View
+    {
+        $this->authorize('inv_purchase_order.view');
+
+        $purchase_order->load(['items.item.unit', 'items.color', 'items.size', 'supplier', 'purchaseRequisition', 'creator', 'approver', 'grns' => function ($q) {
+            $q->with(['items.item', 'receiver'])->latest('receive_date')->latest('id');
+        }]);
+
+        return view('sfl-inventory::admin.purchase-orders.show', ['purchaseOrder' => $purchase_order]);
+    }
+
+    public function edit(InvPurchaseOrder $purchase_order): View
+    {
+        $this->authorize('inv_purchase_order.edit');
+
+        abort_if($purchase_order->status !== 'draft', 403, 'Only draft purchase orders can be edited.');
+
+        $purchase_order->load('items');
+
+        return view('sfl-inventory::admin.purchase-orders.edit', ['purchaseOrder' => $purchase_order] + $this->formOptions($purchase_order->items->pluck('item_id')));
+    }
+
+    public function update(InvPurchaseOrderRequest $request, InvPurchaseOrder $purchase_order): RedirectResponse
+    {
+        abort_if($purchase_order->status !== 'draft', 403, 'Only draft purchase orders can be edited.');
+
+        $data = $request->validated();
+
+        DB::transaction(function () use ($data, $purchase_order) {
+            $total = collect($data['items'])->sum(fn ($line) => $line['quantity'] * ($line['rate'] ?? 0));
+
+            $purchase_order->update([
+                'supplier_id'   => $data['supplier_id'],
+                'order_date'    => $data['order_date'],
+                'expected_date' => $data['expected_date'] ?? null,
+                'total_amount'  => $total,
+                'remarks'       => $data['remarks'] ?? null,
+            ]);
+
+            $purchase_order->items()->delete();
+            foreach ($data['items'] as $line) {
+                $purchase_order->items()->create([
+                    'item_id'  => $line['item_id'],
+                    'quantity' => $line['quantity'],
+                    'rate'     => $line['rate'] ?? 0,
+                    'amount'   => $line['quantity'] * ($line['rate'] ?? 0),
+                ]);
+            }
+        });
+
+        return redirect()->route('inventory.purchase-orders.index')->with('success', 'Purchase order updated successfully.');
+    }
+
+    public function approve(InvPurchaseOrder $purchase_order): RedirectResponse
+    {
+        $this->authorize('inv_purchase_order.approve');
+
+        abort_if($purchase_order->status !== 'draft', 403, 'Only draft purchase orders can be approved.');
+
+        $purchase_order->update([
+            'status'      => 'approved',
+            'approved_by' => auth()->id(),
+            'approved_at' => now(),
+        ]);
+
+        return back()->with('success', 'Purchase order approved successfully.');
+    }
+
+    public function destroy(InvPurchaseOrder $purchase_order): RedirectResponse
+    {
+        $this->authorize('inv_purchase_order.delete');
+
+        if ($purchase_order->isReferenced()) {
+            return back()->with('error', 'This purchase order has GRNs against it and cannot be deleted.');
+        }
+
+        $purchase_order->delete();
+
+        return back()->with('success', 'Purchase order deleted successfully.');
+    }
+
+    public function restore(InvPurchaseOrder $purchase_order): RedirectResponse
+    {
+        $this->authorize('inv_purchase_order.delete');
+
+        $purchase_order->restore();
+
+        return back()->with('success', 'Purchase order restored successfully.');
+    }
+
+    /**
+     * Allowed even if real GRNs (challans) were already received against
+     * this order — the GRN, its items, and everything they already posted
+     * to the stock ledger are kept exactly as-is; they just lose their
+     * back-reference to this order/order-line, same "keep the real
+     * document, drop the link" rule InvPurchaseRequisitionController::
+     * forceDestroy() already uses one level up. Nulled explicitly here
+     * rather than trusted to the migration's declared nullOnDelete()
+     * cascade — checked live against this database and neither FK actually
+     * exists as a real constraint (see InvItemController::forceDestroy for
+     * the same "cascades aren't reliably enforced" precedent).
+     */
+    public function forceDestroy(InvPurchaseOrder $purchase_order): RedirectResponse
+    {
+        $this->authorize('inv_purchase_order.force_delete');
+
+        DB::transaction(function () use ($purchase_order) {
+            $itemIds = DB::table('inv_purchase_order_items')->where('purchase_order_id', $purchase_order->id)->pluck('id');
+
+            if ($itemIds->isNotEmpty()) {
+                DB::table('inv_grn_items')->whereIn('purchase_order_item_id', $itemIds)->update(['purchase_order_item_id' => null]);
+            }
+            DB::table('inv_grns')->where('purchase_order_id', $purchase_order->id)->update(['purchase_order_id' => null]);
+
+            DB::table('inv_purchase_order_items')->where('purchase_order_id', $purchase_order->id)->delete();
+            $purchase_order->forceDelete();
+        });
+
+        return back()->with('success', 'Purchase order permanently deleted.');
+    }
+
+    private function formOptions(iterable $keepItemIds = []): array
+    {
+        // Purchase Orders always target the Accessories store — only items
+        // assigned to it (items without a store can't be bought until Item
+        // Master gives them one; see InvItem::scopeSelectable()).
+        $accessoriesStoreId = InvStore::active()->where('type', 'accessories')->value('id');
+        $keep = collect($keepItemIds)->all();
+
+        return [
+            'suppliers' => InvSupplier::active()->orderBy('name')->get(),
+            'items'     => InvItem::active()->with('unit')
+                ->where(fn ($q) => $q->where('opening_store_id', $accessoriesStoreId)->when($keep, fn ($q2) => $q2->orWhereIn('id', $keep)))
+                ->orderBy('item_name')->get(),
+        ];
+    }
+}

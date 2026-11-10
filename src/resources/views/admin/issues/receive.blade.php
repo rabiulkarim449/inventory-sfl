@@ -1,0 +1,55 @@
+@extends(adminTheme() . 'layouts.app')
+
+@section('title')
+    <title>{{ websiteTitle('Confirm Receipt') }}</title>
+@endsection
+
+@section('contents')
+<div class="flex-grow-1 inv-module">
+    @include('sfl-inventory::admin.partials.alerts')
+    @include('sfl-inventory::admin.partials.ui-kit')
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Confirm Department Receipt — {{ $issue->issue_no }}</h4>
+            <a href="{{ route('inventory.issues.index') }}" class="btn btn-sm ui-act ui-act-back" title="Back"><i class="fa-solid fa-arrow-left"></i> Back</a>
+        </div>
+        <div class="card-body">
+            <p><strong>Department:</strong> {{ $issue->department?->name }} &nbsp;|&nbsp; <strong>Issue Date:</strong> {{ $issue->issue_date?->format('d M Y') }}</p>
+
+            <form method="POST" action="{{ route('inventory.issues.receive', $issue) }}">
+                @csrf
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm align-middle">
+                        <thead><tr><th>Item</th><th>Color</th><th>Size</th><th>Issued Qty</th><th style="width:180px">Received Qty</th></tr></thead>
+                        <tbody>
+                            @foreach($issue->items as $item)
+                                <tr>
+                                    <td>{{ $item->item?->item_code }} — {{ $item->item?->item_name }}</td>
+                                    <td>{{ $item->color?->name ?? '—' }}</td>
+                                    <td>{{ $item->size?->name ?? '—' }}</td>
+                                    <td>{{ $item->issued_qty }}</td>
+                                    <td>
+                                        <input type="hidden" name="items[{{ $loop->index }}][id]" value="{{ $item->id }}">
+                                        <input type="number" step="0.0001" min="0" max="{{ $item->issued_qty }}" class="form-control form-control-sm"
+                                            name="items[{{ $loop->index }}][department_received_qty]"
+                                            value="{{ $item->department_received_qty > 0 ? $item->department_received_qty : $item->issued_qty }}">
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Remarks</label>
+                    <textarea name="department_receive_remarks" class="form-control form-control-sm" rows="2">{{ $issue->department_receive_remarks }}</textarea>
+                </div>
+
+                <button type="submit" class="btn btn-sm ui-act ui-act-receive" title="Confirm Receipt"><i class="fa-solid fa-box-open"></i> Confirm Receipt</button>
+                <a href="{{ route('inventory.issues.index') }}" class="btn btn-sm ui-act ui-act-cancel" title="Cancel"><i class="fa-solid fa-ban"></i> Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+@endsection

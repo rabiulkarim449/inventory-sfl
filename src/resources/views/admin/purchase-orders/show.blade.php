@@ -1,0 +1,133 @@
+@extends(adminTheme() . 'layouts.app')
+
+@section('title')
+    <title>{{ websiteTitle('Store Order ' . $purchaseOrder->po_number) }}</title>
+@endsection
+
+@section('contents')
+<div class="flex-grow-1 inv-module">
+    @include('sfl-inventory::admin.partials.alerts')
+    @include('sfl-inventory::admin.partials.ui-kit')
+
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Store Order {{ $purchaseOrder->po_number }}</h4>
+            <div>
+                @can('inv_grn.add')
+                    @if(in_array($purchaseOrder->status, ['approved', 'received']))
+                        <a href="{{ route('inventory.grns.create-purchase', ['purchase_order_id' => $purchaseOrder->id]) }}" class="btn btn-sm ui-act ui-act-create" title="Receive (New Challan / GRN)"><i class="fa-solid fa-plus"></i> Receive (New Challan / GRN)</a>
+                    @elseif($purchaseOrder->status === 'draft')
+                        <span class="badge p-2 badge-secondary" title="Approve this store order first before a challan can be received against it.">
+                            <i class="fa-solid fa-lock"></i> Approve first to receive
+                        </span>
+                    @endif
+                @endcan
+                <a href="{{ route('inventory.purchase-orders.index') }}" class="btn btn-sm ui-act ui-act-back" title="Back"><i class="fa-solid fa-arrow-left"></i> Back</a>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-3 mb-2"><strong>Purchase Requisition:</strong> {{ $purchaseOrder->purchaseRequisition?->requisition_no ?? '—' }}</div>
+                <div class="col-md-3 mb-2"><strong>Supplier:</strong> {{ $purchaseOrder->supplier?->name }}</div>
+                <div class="col-md-3 mb-2"><strong>Order Date:</strong> {{ $purchaseOrder->order_date?->format('d M Y') }}</div>
+                <div class="col-md-3 mb-2"><strong>Expected Date:</strong> {{ $purchaseOrder->expected_date?->format('d M Y') ?? '—' }}</div>
+                <div class="col-md-3 mb-2">
+                    <strong>Status:</strong>
+                    <span class="badge badge-{{ ['draft' => 'secondary', 'approved' => 'info', 'received' => 'warning', 'closed' => 'success'][$purchaseOrder->status] ?? 'secondary' }}">
+                        {{ ucfirst($purchaseOrder->status) }}
+                    </span>
+                </div>
+                <div class="col-md-3 mb-2"><strong>Items:</strong> {{ $purchaseOrder->items->count() }}</div>
+                <div class="col-md-3 mb-2"><strong>Created By:</strong> {{ $purchaseOrder->creator?->name ?? '—' }}</div>
+                <div class="col-md-3 mb-2">
+                    <strong>Approved By:</strong>
+                    {{ $purchaseOrder->approver?->name ?? '—' }}
+                    @if($purchaseOrder->approved_at)
+                        <span class="text-muted">({{ $purchaseOrder->approved_at->format('d M Y h:i A') }})</span>
+                    @endif
+                </div>
+                <div class="col-md-3 mb-2"><strong>Total Amount:</strong> {{ inv_qty($purchaseOrder->total_amount) }}</div>
+                <div class="col-12"><strong>Remarks:</strong> {{ $purchaseOrder->remarks ?: '—' }}</div>
+            </div>
+
+            <h6>Order Lines — Ordered vs. Received (across all challans)</h6>
+            <p class="text-muted" style="font-size:12px;">Price isn't fixed at order time — each challan below is priced separately against the actual supplier invoice at Store Receive.</p>
+            <div class="table-responsive mb-4">
+                <table class="table table-bordered table-sm align-middle">
+                    <thead>
+                        <tr><th>Item</th><th>Unit</th><th>Color</th><th>Size</th><th class="text-right">Ordered</th><th class="text-right">Received (so far)</th><th class="text-right">Remaining</th><th class="text-right">Rate (at order)</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach($purchaseOrder->items as $line)
+                            @php $remaining = $line->quantity - $line->received_qty; @endphp
+                            <tr>
+                                <td>{{ $line->item?->item_code }} — {{ $line->item?->item_name }}</td>
+                                <td>{{ $line->item?->unit?->short_name }}</td>
+                                <td>{{ $line->color?->name ?? '—' }}</td>
+                                <td>{{ $line->size?->name ?? '—' }}</td>
+                                <td class="text-right">{{ inv_qty($line->quantity) }}</td>
+                                <td class="text-right">{{ inv_qty($line->received_qty) }}</td>
+                                <td class="text-right">
+                                    <span class="badge badge-{{ $remaining <= 0 ? 'success' : 'warning' }}">{{ inv_qty($remaining) }}</span>
+                                </td>
+                                <td class="text-right">{{ (float) $line->rate > 0 ? inv_qty($line->rate) : '—' }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            <h6>Challans Received Against This Store Order ({{ $purchaseOrder->grns->count() }})</h6>
+            <p class="text-muted" style="font-size:13px;">Every delivery — even a partial one — is received as its own separate challan/GRN, shown one by one below in the order received.</p>
+
+            @if($purchaseOrder->grns->isEmpty())
+                <p class="text-muted">No goods have been received against this store order yet.</p>
+            @else
+                @foreach($purchaseOrder->grns as $grn)
+                    <div class="card mb-3 border-{{ $loop->first ? 'primary' : 'secondary' }}">
+                        <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                            <div>
+                                <span class="badge badge-dark mr-2">Challan #{{ $loop->iteration }}</span>
+                                <strong>{{ $grn->grn_number }}</strong>
+                                <span class="text-muted">— Challan/Invoice No: {{ $grn->challan_invoice_no ?? '—' }}</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="badge badge-{{ ['pending' => 'warning', 'posted' => 'success', 'rejected' => 'danger', 'cancelled' => 'secondary'][$grn->status] ?? 'secondary' }}">
+                                    {{ $grn->status === 'pending' ? 'Pending Approval' : ucfirst($grn->status) }}
+                                </span>
+                                <span class="badge badge-info">{{ $grn->receive_date?->format('d M Y') }}</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-sm align-middle mb-2">
+                                    <thead>
+                                        <tr><th>Item Code</th><th>Item Name</th><th class="text-right">Received Qty</th><th class="text-right">Rejected Qty</th><th class="text-right">Rate</th><th class="text-right">Amount</th><th>Lot/Batch</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($grn->items as $gi)
+                                            <tr>
+                                                <td>{{ $gi->item?->item_code }}</td>
+                                                <td>{{ $gi->item?->item_name }}</td>
+                                                <td class="text-right">{{ inv_qty($gi->received_qty) }}</td>
+                                                <td class="text-right">{{ inv_qty($gi->rejected_qty) }}</td>
+                                                <td class="text-right">{{ inv_qty($gi->rate) }}</td>
+                                                <td class="text-right">{{ inv_qty($gi->amount) }}</td>
+                                                <td>{{ collect([$gi->lot_no, $gi->batch_no])->filter()->implode(' / ') ?: '—' }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                    <tfoot>
+                                        <tr class="font-weight-bold"><td colspan="5" class="text-right">Challan Total</td><td class="text-right">{{ inv_qty($grn->total_amount) }}</td><td></td></tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                            <div class="text-muted" style="font-size:12px;">Received by: {{ $grn->receiver?->name ?? '—' }}</div>
+                        </div>
+                    </div>
+                @endforeach
+            @endif
+        </div>
+    </div>
+</div>
+@endsection

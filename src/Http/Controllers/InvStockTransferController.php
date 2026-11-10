@@ -1,0 +1,387 @@
+<?php
+
+namespace ME\SflInventory\Http\Controllers;
+
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
+use ME\SflInventory\Http\Requests\InvStockTransferReceiveRequest;
+use ME\SflInventory\Http\Requests\InvStockTransferRequest;
+use ME\SflInventory\Models\InvColor;
+use ME\SflInventory\Models\InvItem;
+use ME\SflInventory\Models\InvSize;
+use ME\SflInventory\Models\InvStockTransaction;
+use ME\SflInventory\Models\InvStockTransfer;
+use ME\SflInventory\Models\InvStore;
+use ME\SflInventory\Services\InvOperatorScopeService;
+use ME\SflInventory\Services\StockService;
+
+class InvStockTransferController extends Controller
+{
+    public function __construct(
+        private readonly StockService $stock,
+        private readonly InvOperatorScopeService $operatorScope,
+    ) {
+    }
+
+    public function index(Request $request): View
+    {
+        $this->authorize('inv_transfer.list');
+
+        $transfers = InvStockTransfer::query()
+            ->with(['fromStore', 'toStore'])
+            ->when($request->filled('search'), fn ($q) => $q->where('transfer_no', 'like', '%' . $request->search . '%'))
+            ->when($request->filled('item_id'), fn ($q) => $q->whereHas('items', fn ($iq) => $iq->where('item_id', $request->item_id)))
+            ->when($request->filled('from_store_id'), fn ($q) => $q->where('from_store_id', $request->from_store_id))
+            ->when($request->filled('to_store_id'), fn ($q) => $q->where('to_store_id', $request->to_store_id))
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
+            ->when($request->filled('date_from'), fn ($q) => $q->whereDate('transfer_date', '>=', $request->date_from))
+            ->when($request->filled('date_to'), fn ($q) => $q->whereDate('transfer_date', '<=', $request->date_to))
+            ->tap(fn ($q) => $this->operatorScope->applyToAnyStore($q, ['from_store_id', 'to_store_id'], 'created_by'))
+            ->latest('id')
+            ->paginate(20)
+            ->withQueryString();
+
+        $stores = InvStore::active()->orderBy('name')->get();
+
+        $trashedTransfers = InvStockTransfer::onlyTrashed()->with(['fromStore', 'toStore'])->latest('deleted_at')->get()
+            ->map(fn ($transfer) => ['id' => $transfer->id, 'title' => $transfer->transfer_no, 'subtitle' => ($transfer->fromStore?->name ?? '—') . ' → ' . ($transfer->toStore?->name ?? '—'), 'deleted_at' => $transfer->deleted_at]);
+
+        $filterItems = InvItem::active()->orderBy('item_name')->get(['id', 'item_code', 'item_name']);
+
+        return view('sfl-inventory::admin.transfers.index', compact('filterItems', 'transfers', 'stores', 'trashedTransfers'));
+    }
+
+    public function create(): View
+    {
+        $this->authorize('inv_transfer.add');
+
+        return view('sfl-inventory::admin.transfers.create', $this->formOptions());
+    }
+
+    public function show(InvStockTransfer $transfer): View
+    {
+        $this->authorize('inv_transfer.view');
+
+        $transfer->load(['fromStore', 'toStore', 'items.item.unit', 'items.color', 'items.size', 'requester', 'approver', 'receiver']);
+
+        return view('sfl-inventory::admin.transfers.show', ['transfer' => $transfer]);
+    }
+
+    /**
+     * Only a still-pending request can be edited — once approved, stock has
+     * actually left from_store_id, so changing the items/stores at that
+     * point is a delete-and-reverse operation instead (see destroy()).
+     */
+    public function edit(InvStockTransfer $transfer): View
+    {
+        $this->authorize('inv_transfer.edit');
+
+        abort_if($transfer->status !== 'pending', 403, 'Only pending transfer requests can be edited.');
+
+        $transfer->load('items.item', 'items.color', 'items.size');
+
+        return view('sfl-inventory::admin.transfers.edit', ['transfer' => $transfer] + $this->formOptions());
+    }
+
+    public function update(InvStockTransferRequest $request, InvStockTransfer $transfer): RedirectResponse
+    {
+        abort_if($transfer->status !== 'pending', 403, 'Only pending transfer requests can be edited.');
+
+        $data = $request->validated();
+
+        DB::transaction(function () use ($data, $transfer) {
+            $transfer->update([
+                'from_store_id' => $data['from_store_id'],
+                'to_store_id'   => $data['to_store_id'],
+                'transfer_date' => $data['transfer_date'],
+                'remarks'       => $data['remarks'] ?? null,
+            ]);
+
+            $transfer->items()->delete();
+            foreach ($data['items'] as $line) {
+                [$colorId, $sizeId] = InvItem::find($line['item_id'])?->resolvedVariant($line['color_id'] ?? null, $line['size_id'] ?? null)
+                    ?? [$line['color_id'] ?? null, $line['size_id'] ?? null];
+
+                $transfer->items()->create(['item_id' => $line['item_id'], 'color_id' => $colorId, 'size_id' => $sizeId, 'quantity' => $line['quantity']]);
+            }
+        });
+
+        return redirect()->route('inventory.transfers.index')->with('success', "Transfer {$transfer->transfer_no} updated.");
+    }
+
+    /**
+     * Reverses whatever stock has actually moved so far, depending on
+     * status, then removes the transfer:
+     * - pending/rejected: nothing was ever posted, just delete.
+     * - in_transit: qty_out already left from_store_id — reverse that with
+     *   a qty_in there, which is always safe (adding stock back can never
+     *   go negative, so no guard needed on that side).
+     * - received: qty_out left from_store_id (reversed the same safe way)
+     *   AND qty_in landed in to_store_id — reversing *that* removes stock
+     *   (qty_out), so it's guarded in case that stock has since moved on
+     *   elsewhere.
+     */
+    public function destroy(InvStockTransfer $transfer): RedirectResponse
+    {
+        $this->authorize('inv_transfer.delete');
+
+        $transfer->load('items');
+
+        try {
+            if ($transfer->status === 'received') {
+                foreach ($transfer->items as $line) {
+                    if ($line->received_qty > 0) {
+                        $this->assertReversible($line->item_id, $transfer->to_store_id, $line->received_qty, $line->item?->item_name, $line->color_id, $line->size_id);
+                    }
+                }
+            }
+        } catch (ValidationException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        DB::transaction(function () use ($transfer) {
+            if (in_array($transfer->status, ['in_transit', 'received'], true)) {
+                foreach ($transfer->items as $line) {
+                    // A qty_in-only post with no 'rate' falls back to 0 in
+                    // StockService::post() (the average-rate fallback only
+                    // triggers for qty_out) — so restore at the exact rate
+                    // the original dispatch deducted at, not 0.
+                    $dispatchRate = InvStockTransaction::where('reference_type', 'inv_stock_transfer')
+                        ->where('reference_id', $transfer->id)
+                        ->where('item_id', $line->item_id)
+                        ->where('color_id', $line->color_id)
+                        ->where('size_id', $line->size_id)
+                        ->where('store_id', $transfer->from_store_id)
+                        ->where('transaction_type', 'transfer')
+                        ->where('qty_out', '>', 0)
+                        ->value('rate');
+
+                    $this->stock->post([
+                        'item_id'          => $line->item_id,
+                        'color_id'         => $line->color_id,
+                        'size_id'          => $line->size_id,
+                        'store_id'         => $transfer->from_store_id,
+                        'transaction_date' => now()->toDateString(),
+                        'transaction_type' => 'transfer_reversal',
+                        'qty_in'           => $line->quantity,
+                        'rate'             => $dispatchRate,
+                        'reference_type'   => 'inv_stock_transfer',
+                        'reference_id'     => $transfer->id,
+                        'remarks'          => "Reversal (dispatch) of Transfer {$transfer->transfer_no}",
+                        'created_by'       => auth()->id(),
+                    ]);
+                }
+            }
+
+            if ($transfer->status === 'received') {
+                foreach ($transfer->items as $line) {
+                    if ($line->received_qty > 0) {
+                        $this->stock->post([
+                            'item_id'          => $line->item_id,
+                            'color_id'         => $line->color_id,
+                            'size_id'          => $line->size_id,
+                            'store_id'         => $transfer->to_store_id,
+                            'transaction_date' => now()->toDateString(),
+                            'transaction_type' => 'transfer_reversal',
+                            'qty_out'          => $line->received_qty,
+                            'reference_type'   => 'inv_stock_transfer',
+                            'reference_id'     => $transfer->id,
+                            'remarks'          => "Reversal (receipt) of Transfer {$transfer->transfer_no}",
+                            'created_by'       => auth()->id(),
+                        ]);
+                    }
+                }
+            }
+
+            $transfer->delete();
+        });
+
+        return redirect()->route('inventory.transfers.index')->with('success', "Transfer {$transfer->transfer_no} deleted and stock reversed.");
+    }
+
+    public function restore(InvStockTransfer $transfer): RedirectResponse
+    {
+        $this->authorize('inv_transfer.delete');
+
+        $transfer->restore();
+
+        return back()->with('success', 'Transfer restored successfully.');
+    }
+
+    /**
+     * Stock was already reversed when the transfer was soft-deleted, so this
+     * just removes the record — its line items are deleted first since this
+     * database's declared FK cascades aren't reliably enforced (see
+     * InvItemController::forceDestroy).
+     */
+    public function forceDestroy(InvStockTransfer $transfer): RedirectResponse
+    {
+        $this->authorize('inv_transfer.force_delete');
+
+        DB::transaction(function () use ($transfer) {
+            DB::table('inv_stock_transfer_items')->where('transfer_id', $transfer->id)->delete();
+            $transfer->forceDelete();
+        });
+
+        return back()->with('success', 'Transfer permanently deleted.');
+    }
+
+    private function assertReversible(int $itemId, int $storeId, float $qty, ?string $itemName, ?int $colorId = null, ?int $sizeId = null): void
+    {
+        $available = $this->stock->currentStock($itemId, $storeId, $colorId, $sizeId);
+        if ($available < $qty) {
+            throw ValidationException::withMessages([
+                'items' => 'Cannot delete this transfer: "' . ($itemName ?? "item #{$itemId}") . '" only has ' . inv_qty($available) . ' left in that store, but this transfer moved ' . inv_qty($qty) . ' — some has already been used elsewhere. Post a Stock Adjustment instead.',
+            ]);
+        }
+    }
+
+    public function store(InvStockTransferRequest $request): RedirectResponse
+    {
+        $data = $request->validated();
+
+        $transfer = DB::transaction(function () use ($data) {
+            $transfer = InvStockTransfer::create([
+                'from_store_id' => $data['from_store_id'],
+                'to_store_id'   => $data['to_store_id'],
+                'transfer_date' => $data['transfer_date'],
+                'status'        => 'pending',
+                'requested_by'  => auth()->id(),
+                'remarks'       => $data['remarks'] ?? null,
+                'created_by'    => auth()->id(),
+            ]);
+
+            foreach ($data['items'] as $line) {
+                [$colorId, $sizeId] = InvItem::find($line['item_id'])?->resolvedVariant($line['color_id'] ?? null, $line['size_id'] ?? null)
+                    ?? [$line['color_id'] ?? null, $line['size_id'] ?? null];
+
+                $transfer->items()->create(['item_id' => $line['item_id'], 'color_id' => $colorId, 'size_id' => $sizeId, 'quantity' => $line['quantity']]);
+            }
+
+            return $transfer;
+        });
+
+        return redirect()->route('inventory.transfers.index')->with('success', "Transfer {$transfer->transfer_no} requested successfully.");
+    }
+
+    /**
+     * Approving a transfer request dispatches it: stock leaves from_store_id
+     * immediately (status -> in_transit), matching the spec's 3-step
+     * Request -> Approval -> Receive workflow.
+     */
+    public function approve(InvStockTransfer $transfer): RedirectResponse
+    {
+        $this->authorize('inv_transfer.approve');
+
+        abort_if($transfer->status !== 'pending', 403, 'Only pending transfers can be approved.');
+
+        DB::transaction(function () use ($transfer) {
+            foreach ($transfer->items as $line) {
+                $this->stock->post([
+                    'item_id'          => $line->item_id,
+                    'color_id'         => $line->color_id,
+                    'size_id'          => $line->size_id,
+                    'store_id'         => $transfer->from_store_id,
+                    'transaction_date' => $transfer->transfer_date,
+                    'transaction_type' => 'transfer',
+                    'qty_out'          => $line->quantity,
+                    'reference_type'   => 'inv_stock_transfer',
+                    'reference_id'     => $transfer->id,
+                    'remarks'          => "Transfer {$transfer->transfer_no} dispatched",
+                    'created_by'       => auth()->id(),
+                ]);
+            }
+
+            $transfer->update(['status' => 'in_transit', 'approved_by' => auth()->id(), 'approved_at' => now()]);
+        });
+
+        return back()->with('success', "Transfer {$transfer->transfer_no} approved and dispatched.");
+    }
+
+    public function reject(InvStockTransfer $transfer): RedirectResponse
+    {
+        $this->authorize('inv_transfer.approve');
+
+        abort_if($transfer->status !== 'pending', 403, 'Only pending transfers can be rejected.');
+
+        $transfer->update(['status' => 'rejected', 'approved_by' => auth()->id(), 'approved_at' => now()]);
+
+        return back()->with('success', "Transfer {$transfer->transfer_no} rejected.");
+    }
+
+    public function receiveForm(InvStockTransfer $transfer): View
+    {
+        $this->authorize('inv_transfer.receive');
+
+        abort_if($transfer->status !== 'in_transit', 403, 'Only in-transit transfers can be received.');
+
+        $transfer->load('items.item', 'items.color', 'items.size');
+
+        return view('sfl-inventory::admin.transfers.receive', compact('transfer'));
+    }
+
+    public function receive(InvStockTransferReceiveRequest $request, InvStockTransfer $transfer): RedirectResponse
+    {
+        abort_if($transfer->status !== 'in_transit', 403, 'Only in-transit transfers can be received.');
+
+        $data = $request->validated();
+
+        DB::transaction(function () use ($data, $transfer) {
+            foreach ($data['items'] as $line) {
+                $item = $transfer->items()->findOrFail($line['id']);
+                $item->update(['received_qty' => $line['received_qty']]);
+
+                if ($line['received_qty'] > 0) {
+                    // Same qty_in-defaults-to-rate-0 trap as the dispatch
+                    // reversal above — carry over the source store's average
+                    // cost at dispatch time instead of losing it to 0.
+                    // Scoped to this item's exact variant too, so a transfer
+                    // carrying several colors/sizes of the same item each
+                    // gets its own variant's dispatch rate, not the first
+                    // matching row for the item overall.
+                    $dispatchRate = InvStockTransaction::where('reference_type', 'inv_stock_transfer')
+                        ->where('reference_id', $transfer->id)
+                        ->where('item_id', $item->item_id)
+                        ->where('color_id', $item->color_id)
+                        ->where('size_id', $item->size_id)
+                        ->where('store_id', $transfer->from_store_id)
+                        ->where('transaction_type', 'transfer')
+                        ->where('qty_out', '>', 0)
+                        ->value('rate');
+
+                    $this->stock->post([
+                        'item_id'          => $item->item_id,
+                        'color_id'         => $item->color_id,
+                        'size_id'          => $item->size_id,
+                        'store_id'         => $transfer->to_store_id,
+                        'transaction_date' => now()->toDateString(),
+                        'transaction_type' => 'transfer',
+                        'qty_in'           => $line['received_qty'],
+                        'rate'             => $dispatchRate,
+                        'reference_type'   => 'inv_stock_transfer',
+                        'reference_id'     => $transfer->id,
+                        'remarks'          => "Transfer {$transfer->transfer_no} received",
+                        'created_by'       => auth()->id(),
+                    ]);
+                }
+            }
+
+            $transfer->update(['status' => 'received', 'received_by' => auth()->id(), 'received_at' => now()]);
+        });
+
+        return redirect()->route('inventory.transfers.index')->with('success', "Transfer {$transfer->transfer_no} received.");
+    }
+
+    private function formOptions(): array
+    {
+        return [
+            'stores' => InvStore::active()->orderBy('name')->get(),
+            'items'  => InvItem::active()->orderBy('item_name')->get(),
+            'colors' => InvColor::active()->orderBy('name')->get(),
+            'sizes'  => InvSize::active()->ordered()->get(),
+        ];
+    }
+}

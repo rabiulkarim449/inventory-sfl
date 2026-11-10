@@ -1,0 +1,44 @@
+<?php
+
+return [
+    'name' => 'Inventory Management',
+
+    'route' => [
+        'prefix'     => 'admin/inventory',
+        'as'         => 'inventory.',
+        'middleware' => ['web', 'auth'],
+    ],
+
+    'company' => [
+        'name'    => env('COMPANY_NAME', 'SUHANA FASHIONS LTD.'),
+        'address' => env('COMPANY_ADDRESS', 'Kathgora, Ashulia, Savar, Dhaka, Bangladesh'),
+    ],
+
+    // Prefixes used by ME\SflInventory\Services\DocumentNumberService to
+    // auto-generate unique document numbers (e.g. PO-000001, GRN-000001).
+    // 'company' prefixes item codes: SFL-{category code}-{seq}, e.g. SFL-SW-055.
+    'document_prefixes' => [
+        'company'              => env('SFL_INVENTORY_COMPANY_CODE', 'SFL'),
+        'item'                 => 'ITM',
+        'purchase_requisition' => 'PREQ',
+        'purchase_order'       => 'SO',
+        'grn'                  => 'GRN',
+        'requisition'          => 'REQ',
+        'issue'                => 'ISS',
+        'issue_return'         => 'RET',
+        'transfer'             => 'TRF',
+        'consumption'          => 'CONS',
+        'fg_receive'           => 'FGR',
+        'gate_pass'            => 'CL', // Delivery Challan, daily: CL261017-001
+        'shipment'             => 'SHP',
+        'adjustment'           => 'ADJ',
+    ],
+
+    // An item with no outbound movement in this many days is flagged as dead stock.
+    'dead_stock_days' => 90,
+
+    // Store Requisition: pick Buyer / Style / PO from Merchandising (true), or
+    // the Inventory buyer list with free-text style / order ref (false).
+    // Buyers and styles live in Merchandising only, so this is on by default.
+    'requisition_merchandising_link' => env('SFL_INVENTORY_REQUISITION_MER_LINK', true),
+];

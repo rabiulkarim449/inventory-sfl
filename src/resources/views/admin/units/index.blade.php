@@ -1,0 +1,174 @@
+@extends(adminTheme() . 'layouts.app')
+
+@section('title')
+    <title>{{ websiteTitle('Units') }}</title>
+@endsection
+
+@section('contents')
+<div class="flex-grow-1 inv-module">
+    @include('sfl-inventory::admin.partials.alerts')
+    @include('sfl-inventory::admin.partials.ui-kit')
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Units</h4>
+            <div>
+                @can('inv_unit.delete')
+                    <button type="button" class="btn btn-sm ui-act ui-act-delete" data-toggle="modal" data-target="#unitTrashModal" title="Trash"><i class="fa-solid fa-trash"></i> Trash<span class="ui-btn-count">{{ $trashedUnits->count() }}</span></button>
+                @endcan
+                @can('inv_unit.add')
+                    <button type="button" class="btn btn-sm ui-act ui-act-create" data-toggle="modal" data-target="#createUnitModal" title="Add Unit"><i class="fa-solid fa-plus"></i> Add Unit</button>
+                @endcan
+            </div>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="row mb-3 align-items-end">
+                <div class="col-md-3 mb-2">
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Search name" value="{{ request('search') }}">
+                </div>
+                <div class="col-md-3 mb-2">
+                    <select name="status" class="form-control form-control-sm inv-select2">
+                        <option value="">All Status</option>
+                        <option value="active" @selected(request('status') === 'active')>Active</option>
+                        <option value="inactive" @selected(request('status') === 'inactive')>Inactive</option>
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2 d-flex align-items-end flex-wrap gap-1">
+                    <button type="submit" class="btn btn-sm ui-act ui-act-filter" title="Filter"><i class="fa-solid fa-filter"></i> Filter</button>
+                    <a href="{{ route('inventory.units.index') }}" class="btn btn-sm ui-act ui-act-reset" title="Reset"><i class="fa-solid fa-rotate-left"></i> Reset</a>
+                </div>
+            </form>
+
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th>Short Name</th>
+                            <th>Status</th>
+                            <th class="text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($units as $unit)
+                            <tr>
+                                <td>{{ $loop->iteration + $units->firstItem() - 1 }}</td>
+                                <td>{{ $unit->name }}</td>
+                                <td>{{ $unit->short_name }}</td>
+                                <td>
+                                    <span class="badge badge-{{ $unit->is_active ? 'success' : 'secondary' }}">
+                                        {{ $unit->is_active ? 'Active' : 'Inactive' }}
+                                    </span>
+                                </td>
+                                <td class="text-right">
+                                    <button type="button" class="btn-custom ui-act ui-act-view" data-toggle="modal"
+                                        data-target="#viewUnitModal{{ $unit->id }}" title="View"><i class="fa-solid fa-eye"></i></button>
+                                    @can('inv_unit.edit')
+                                        <button type="button" class="btn-custom ui-act ui-act-edit" data-toggle="modal"
+                                            data-target="#editUnitModal{{ $unit->id }}" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+                                    @endcan
+                                    @can('inv_unit.delete')
+                                        <button type="button" class="btn-custom ui-act ui-act-delete" data-toggle="modal"
+                                            data-target="#deleteUnitModal" data-action="{{ route('inventory.units.destroy', $unit) }}" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                                    @endcan
+                                </td>
+                            </tr>
+
+                            <div class="modal fade" id="viewUnitModal{{ $unit->id }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Unit Details</h5>
+                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <dl class="row mb-0">
+                                                <dt class="col-sm-4">Name</dt><dd class="col-sm-8">{{ $unit->name }}</dd>
+                                                <dt class="col-sm-4">Short Name</dt><dd class="col-sm-8">{{ $unit->short_name }}</dd>
+                                                <dt class="col-sm-4">Status</dt>
+                                                <dd class="col-sm-8">
+                                                    <span class="badge badge-{{ $unit->is_active ? 'success' : 'secondary' }}">
+                                                        {{ $unit->is_active ? 'Active' : 'Inactive' }}
+                                                    </span>
+                                                </dd>
+                                            </dl>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-sm ui-act ui-act-cancel" data-dismiss="modal" title="Close"><i class="fa-solid fa-ban"></i> Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            @can('inv_unit.edit')
+                                <div class="modal fade" id="editUnitModal{{ $unit->id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-lg">
+                                        <div class="modal-content">
+                                            <form method="POST" action="{{ route('inventory.units.update', $unit) }}">
+                                                @csrf @method('PUT')
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Edit Unit</h5>
+                                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    @include('sfl-inventory::admin.units.partials.fields', ['unit' => $unit])
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-sm ui-act ui-act-cancel" data-dismiss="modal" title="Cancel"><i class="fa-solid fa-ban"></i> Cancel</button>
+                                                    <button type="submit" class="btn btn-sm ui-act ui-act-save" title="Update"><i class="fa-solid fa-floppy-disk"></i> Update</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endcan
+                        @empty
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">No units found.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            {{ $units->links('pagination::bootstrap-5') }}
+        </div>
+    </div>
+</div>
+
+@can('inv_unit.add')
+    <div class="modal fade" id="createUnitModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form method="POST" action="{{ route('inventory.units.store') }}">
+                    @csrf
+                    <div class="modal-header">
+                        <h5 class="modal-title">Add Unit</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    </div>
+                    <div class="modal-body">
+                        @include('sfl-inventory::admin.units.partials.fields', ['unit' => null])
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-sm ui-act ui-act-cancel" data-dismiss="modal" title="Cancel"><i class="fa-solid fa-ban"></i> Cancel</button>
+                        <button type="submit" class="btn btn-sm ui-act ui-act-save" title="Save"><i class="fa-solid fa-floppy-disk"></i> Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+@endcan
+
+@include('sfl-inventory::admin.partials.delete-confirm-modal', ['modalId' => 'deleteUnitModal', 'label' => 'unit'])
+@include('sfl-inventory::admin.partials.trash-modal', [
+    'modalId' => 'unitTrashModal',
+    'label' => 'Unit',
+    'rows' => $trashedUnits,
+    'restoreRoute' => 'inventory.units.restore',
+    'forceRoute' => 'inventory.units.force-destroy',
+    'canRestore' => auth()->user()->can('inv_unit.delete'),
+    'canForce' => auth()->user()->can('inv_unit.force_delete'),
+])
+@include('sfl-inventory::admin.partials.select2-init')
+@endsection

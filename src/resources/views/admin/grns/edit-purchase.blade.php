@@ -1,0 +1,208 @@
+@extends(adminTheme() . 'layouts.app')
+
+@section('title')
+    <title>{{ websiteTitle('Edit GRN ' . $grn->grn_number) }}</title>
+@endsection
+
+@section('contents')
+<div class="flex-grow-1 inv-module">
+    @include('sfl-inventory::admin.partials.alerts')
+    @include('sfl-inventory::admin.partials.ui-kit')
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Edit Purchase Challan — {{ $grn->grn_number }}{{ $grn->purchaseOrder ? ' — against ' . $grn->purchaseOrder->po_number : '' }}</h4>
+            <a href="{{ route('inventory.grns.show', $grn) }}" class="btn btn-sm ui-act ui-act-back" title="Back"><i class="fa-solid fa-arrow-left"></i> Back</a>
+        </div>
+        <div class="card-body">
+            @if($grn->status === 'pending')
+                <div class="alert alert-info">This challan is still pending Receive Approval — no stock has posted yet, so changes here just update the pending record.</div>
+            @else
+                <div class="alert alert-warning">Editing a posted GRN reverses its original stock entries and re-posts the corrected quantities. This is blocked if any of this GRN's stock has already been issued or used elsewhere.</div>
+            @endif
+
+            <form method="POST" action="{{ route('inventory.grns.update', $grn) }}">
+                @csrf @method('PUT')
+                <input type="hidden" name="source_type" value="purchase">
+                <input type="hidden" name="store_id" value="{{ $grn->store_id }}">
+                <input type="hidden" name="supplier_id" value="{{ $grn->supplier_id }}">
+                @if($grn->purchase_order_id)
+                    <input type="hidden" name="purchase_order_id" value="{{ $grn->purchase_order_id }}">
+                @endif
+
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Store</label>
+                        <input type="text" class="form-control form-control-sm" value="{{ $grn->store?->name }}" disabled>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Supplier</label>
+                        <input type="text" class="form-control form-control-sm" value="{{ $grn->supplier?->name }}" disabled>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Receive Date <span class="text-danger">*</span></label>
+                        <input type="date" name="receive_date" class="form-control form-control-sm" value="{{ old('receive_date', optional($grn->receive_date)->format('Y-m-d')) }}" required>
+                    </div>
+                    @if($merLinked ?? false)
+                        {{-- Optional: Buyer → Style → PO from Merchandising. --}}
+                        @include('sfl-inventory::admin.partials.mer-buyer-style', ['pick' => ['id' => 'pgrn', 'buyer' => $grn->msfl_buyer_id, 'style' => app(\ME\SflInventory\Services\MerchandisingLink::class)->pickedStyleValue($grn->msfl_style_id, $grn->style), 'po' => $grn->msfl_order_po_id]])
+                    @endif
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Invoice / Challan No.</label>
+                        <input type="text" name="challan_invoice_no" class="form-control form-control-sm" value="{{ old('challan_invoice_no', $grn->challan_invoice_no) }}" placeholder="Supplier's invoice or challan number">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Received By</label>
+                        <select name="received_by" class="form-control form-control-sm inv-select2">
+                            <option value="">— Select —</option>
+                            @foreach($employees as $employee)
+                                <option value="{{ $employee->id }}" @selected(old('received_by', $grn->received_by) == $employee->id)>{{ $employee->name }} ({{ $employee->employee_id }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-12 mb-3">
+                        <label class="form-label">Remarks</label>
+                        <textarea name="remarks" class="form-control form-control-sm" rows="2">{{ old('remarks', $grn->remarks) }}</textarea>
+                    </div>
+                </div>
+
+                <hr>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">Items</h6>
+                    @unless($grn->purchase_order_id)
+                        <button type="button" class="btn btn-sm ui-act ui-act-create" data-line-items-add="grn" title="Add Row"><i class="fa-solid fa-plus"></i> Add Row</button>
+                    @else
+                        <span class="text-muted" style="font-size:12px;">This GRN's own lines against {{ $grn->purchaseOrder->po_number }} — new items must be received via a new GRN.</span>
+                    @endunless
+                </div>
+
+                @if($grn->purchase_order_id)
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm align-middle">
+                            <thead>
+                                <tr><th style="min-width:220px">Item</th><th>Color</th><th>Size</th><th>Due Qty</th><th style="width:150px">Received Qty</th><th style="width:140px">Rate</th><th style="width:140px">Amount</th><th>Expiry Date</th></tr>
+                            </thead>
+                            <tbody id="grnRowsBody">
+                                @foreach($grn->items as $index => $grnItem)
+                                    @php
+                                        $poItem = $grnItem->purchaseOrderItem;
+                                        $due = $poItem ? $poItem->quantity - ($poItem->received_qty - $grnItem->received_qty) : $grnItem->received_qty;
+                                    @endphp
+                                    <tr>
+                                        <td>
+                                            {{ $grnItem->item?->item_code }} — {{ $grnItem->item?->item_name }}
+                                            <input type="hidden" name="items[{{ $index }}][item_id]" value="{{ $grnItem->item_id }}">
+                                            <input type="hidden" name="items[{{ $index }}][purchase_order_item_id]" value="{{ $grnItem->purchase_order_item_id }}">
+                                            <input type="hidden" name="items[{{ $index }}][ordered_qty]" value="{{ $due }}">
+                                            <input type="hidden" name="items[{{ $index }}][rejected_qty]" value="{{ $grnItem->rejected_qty }}">
+                                        </td>
+                                        <td>{{ $grnItem->color?->name ?? '—' }}</td>
+                                        <td>{{ $grnItem->size?->name ?? '—' }}</td>
+                                        <td>{{ inv_qty($due) }}</td>
+                                        <td><input type="number" step="0.0001" min="0.0001" max="{{ $due }}" name="items[{{ $index }}][received_qty]" class="form-control form-control-sm" data-role="qty" value="{{ old('items.' . $index . '.received_qty', $grnItem->received_qty) }}" required></td>
+                                        <td><input type="number" step="0.01" min="0" name="items[{{ $index }}][rate]" class="form-control form-control-sm" data-role="rate" value="{{ old('items.' . $index . '.rate', $grnItem->rate) }}" required></td>
+                                        <td><input type="text" class="form-control form-control-sm" data-role="amount" disabled></td>
+                                        <td><input type="date" name="items[{{ $index }}][expiry_date]" class="form-control form-control-sm" value="{{ old('items.' . $index . '.expiry_date', optional($grnItem->expiry_date)->format('Y-m-d')) }}"></td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm align-middle">
+                            <thead>
+                                <tr><th style="min-width:220px">Item</th><th style="width:90px">Unit</th><th style="width:120px">Color</th><th style="width:120px">Size</th><th>Received Qty</th><th>Rejected Qty</th><th>Rate</th><th>Lot No</th><th>Batch No</th><th>Expiry Date</th><th>Amount</th><th></th></tr>
+                            </thead>
+                            <tbody id="grnRowsBody">
+                                @foreach(old('items', $grn->items->map(fn ($i) => ['item_id' => $i->item_id, 'color_id' => $i->color_id, 'size_id' => $i->size_id, 'received_qty' => (float) $i->received_qty, 'rejected_qty' => (float) $i->rejected_qty, 'rate' => (float) $i->rate, 'lot_no' => $i->lot_no, 'batch_no' => $i->batch_no, 'expiry_date' => optional($i->expiry_date)->format('Y-m-d')])->all()) as $index => $line)
+                                    @php $selectedItem = $items->firstWhere('id', (int) ($line['item_id'] ?? null)); @endphp
+                                    <tr>
+                                        <td>
+                                            <select name="items[{{ $index }}][item_id]" class="form-control form-control-sm inv-select2" required>
+                                                <option value="">— Select —</option>
+                                                @foreach($items as $item)
+                                                    <option value="{{ $item->id }}" data-unit="{{ $item->unit?->short_name }}" data-store="{{ $item->opening_store_id }}" data-color-id="{{ $item->color_id }}" data-size-id="{{ $item->size_id }}" @selected(($line['item_id'] ?? null) == $item->id)>{{ $item->item_code }} — {{ $item->item_name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </td>
+                                        <td><input type="text" class="form-control form-control-sm" data-role="unit" value="{{ $selectedItem?->unit?->short_name }}" disabled></td>
+                                        <td>
+                                            <select name="items[{{ $index }}][color_id]" class="form-control form-control-sm">
+                                                <option value="">— Select —</option>
+                                                @foreach($colors as $color)
+                                                    <option value="{{ $color->id }}" @selected(($line['color_id'] ?? null) == $color->id)>{{ $color->name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select name="items[{{ $index }}][size_id]" class="form-control form-control-sm">
+                                                <option value="">— Select —</option>
+                                                @foreach($sizes as $size)
+                                                    <option value="{{ $size->id }}" @selected(($line['size_id'] ?? null) == $size->id)>{{ $size->name }}</option>
+                                                @endforeach
+                                            </select>
+                                        </td>
+                                        <td><input type="number" step="0.0001" min="0.0001" name="items[{{ $index }}][received_qty]" class="form-control form-control-sm" data-role="qty" value="{{ $line['received_qty'] ?? '' }}" required></td>
+                                        <td><input type="number" step="0.0001" min="0" name="items[{{ $index }}][rejected_qty]" class="form-control form-control-sm" value="{{ $line['rejected_qty'] ?? 0 }}"></td>
+                                        <td><input type="number" step="0.01" min="0" name="items[{{ $index }}][rate]" class="form-control form-control-sm" data-role="rate" value="{{ $line['rate'] ?? '' }}" required></td>
+                                        <td><input type="text" name="items[{{ $index }}][lot_no]" class="form-control form-control-sm" value="{{ $line['lot_no'] ?? '' }}"></td>
+                                        <td><input type="text" name="items[{{ $index }}][batch_no]" class="form-control form-control-sm" value="{{ $line['batch_no'] ?? '' }}"></td>
+                                        <td><input type="date" name="items[{{ $index }}][expiry_date]" class="form-control form-control-sm" value="{{ $line['expiry_date'] ?? '' }}"></td>
+                                        <td><input type="text" class="form-control form-control-sm" data-role="amount" disabled></td>
+                                        <td><button type="button" class="btn-custom ui-act ui-act-delete" data-line-items-remove title="Delete"><i class="fa-solid fa-trash"></i></button></td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <template id="grnRowTemplate">
+                        <tr>
+                            <td>
+                                <select name="items[__INDEX__][item_id]" class="form-control form-control-sm inv-select2" required>
+                                    <option value="">— Select —</option>
+                                    @foreach($items as $item)
+                                        <option value="{{ $item->id }}" data-unit="{{ $item->unit?->short_name }}" data-store="{{ $item->opening_store_id }}" data-color-id="{{ $item->color_id }}" data-size-id="{{ $item->size_id }}">{{ $item->item_code }} — {{ $item->item_name }}</option>
+                                    @endforeach
+                                </select>
+                            </td>
+                            <td><input type="text" class="form-control form-control-sm" data-role="unit" disabled></td>
+                            <td>
+                                <select name="items[__INDEX__][color_id]" class="form-control form-control-sm">
+                                    <option value="">— Select —</option>
+                                    @foreach($colors as $color)
+                                        <option value="{{ $color->id }}">{{ $color->name }}</option>
+                                    @endforeach
+                                </select>
+                            </td>
+                            <td>
+                                <select name="items[__INDEX__][size_id]" class="form-control form-control-sm">
+                                    <option value="">— Select —</option>
+                                    @foreach($sizes as $size)
+                                        <option value="{{ $size->id }}">{{ $size->name }}</option>
+                                    @endforeach
+                                </select>
+                            </td>
+                            <td><input type="number" step="0.0001" min="0.0001" name="items[__INDEX__][received_qty]" class="form-control form-control-sm" data-role="qty" required></td>
+                            <td><input type="number" step="0.0001" min="0" name="items[__INDEX__][rejected_qty]" class="form-control form-control-sm" value="0"></td>
+                            <td><input type="number" step="0.01" min="0" name="items[__INDEX__][rate]" class="form-control form-control-sm" data-role="rate" required></td>
+                            <td><input type="text" name="items[__INDEX__][lot_no]" class="form-control form-control-sm"></td>
+                            <td><input type="text" name="items[__INDEX__][batch_no]" class="form-control form-control-sm"></td>
+                            <td><input type="date" name="items[__INDEX__][expiry_date]" class="form-control form-control-sm"></td>
+                            <td><input type="text" class="form-control form-control-sm" data-role="amount" disabled></td>
+                            <td><button type="button" class="btn-custom ui-act ui-act-delete" data-line-items-remove title="Delete"><i class="fa-solid fa-trash"></i></button></td>
+                        </tr>
+                    </template>
+                @endif
+
+                <button type="submit" class="btn mt-3 btn-sm ui-act ui-act-save" title="Save"><i class="fa-solid fa-floppy-disk"></i> {{ $grn->status === 'pending' ? 'Save Changes' : 'Save Changes & Re-post Stock' }}</button>
+                <a href="{{ route('inventory.grns.show', $grn) }}" class="btn mt-3 btn-sm ui-act ui-act-cancel" title="Cancel"><i class="fa-solid fa-ban"></i> Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+
+@include('sfl-inventory::admin.partials.select2-init')
+@include('sfl-inventory::admin.partials.line-items-script')
+@endsection

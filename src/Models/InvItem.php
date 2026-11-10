@@ -1,0 +1,182 @@
+<?php
+
+namespace ME\SflInventory\Models;
+
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Traits\HasAudit;
+
+class InvItem extends Model
+{
+    use HasAudit;
+    use HasFactory;
+    use SoftDeletes;
+
+    protected $table = 'inv_items';
+
+    protected $fillable = [
+        'item_code', 'item_name', 'category_id', 'sub_category_id', 'department_id', 'supplier_id', 'buyer_id',
+        'unit_id', 'brand_id', 'color_id', 'size_id', 'specification', 'item_type', 'minimum_stock', 'maximum_stock',
+        'opening_stock', 'opening_value', 'opening_store_id', 'barcode', 'barcode_enabled', 'is_active', 'created_by', 'msfl_style_id',
+    ];
+
+    protected $casts = [
+        'minimum_stock'   => 'decimal:4',
+        'maximum_stock'   => 'decimal:4',
+        'opening_stock'   => 'decimal:4',
+        'opening_value'   => 'decimal:2',
+        'is_active'       => 'boolean',
+        'barcode_enabled' => 'boolean',
+    ];
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(InvItemCategory::class, 'category_id');
+    }
+
+    public function subCategory(): BelongsTo
+    {
+        return $this->belongsTo(InvItemCategory::class, 'sub_category_id');
+    }
+
+    public function unit(): BelongsTo
+    {
+        return $this->belongsTo(InvUnit::class, 'unit_id');
+    }
+
+    public function brand(): BelongsTo
+    {
+        return $this->belongsTo(InvBrand::class, 'brand_id');
+    }
+
+    public function color(): BelongsTo
+    {
+        return $this->belongsTo(InvColor::class, 'color_id');
+    }
+
+    public function size(): BelongsTo
+    {
+        return $this->belongsTo(InvSize::class, 'size_id');
+    }
+
+    /**
+     * Resolves the color/size a transaction line should actually be tagged
+     * with: if this item already has its own fixed color_id/size_id, that
+     * always wins (the line's picker is hidden/disabled client-side for
+     * exactly this reason, so nothing is submitted for it) — otherwise the
+     * explicitly picked value is used. Keeps every transaction controller
+     * consistent instead of each re-deriving this itself.
+     */
+    public function resolvedVariant(?int $colorId, ?int $sizeId): array
+    {
+        return [$this->color_id ?? $colorId, $this->size_id ?? $sizeId];
+    }
+
+    public function openingStore(): BelongsTo
+    {
+        return $this->belongsTo(InvStore::class, 'opening_store_id');
+    }
+
+    /** @var array<int, true>|null store id => true, for every Buyer Store */
+    private static ?array $buyerStoreMap = null;
+
+    /** Ids of every Buyer Store (cached per request). */
+    public static function buyerStoreIds(): array
+    {
+        self::$buyerStoreMap ??= InvStore::withTrashed()->where('type', InvStore::TYPE_BUYER)->pluck('id')
+            ->mapWithKeys(fn ($id) => [(int) $id => true])->all();
+
+        return array_keys(self::$buyerStoreMap);
+    }
+
+    /**
+     * An item has one home store (opening_store_id), e.g. the General Store.
+     * Besides that, the same item may also be held in any Buyer Store —
+     * there the stock is kept apart per buyer + style by the GRN / Issue
+     * headers (see StockService::styleBalance()), so one item can serve
+     * several buyers at once.
+     */
+    public function canBeInStore(?int $storeId): bool
+    {
+        if (! $storeId) {
+            return false;
+        }
+        if ((int) $this->opening_store_id === $storeId) {
+            return true;
+        }
+
+        return in_array($storeId, self::buyerStoreIds(), true);
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(InvDepartment::class, 'department_id');
+    }
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(InvSupplier::class, 'supplier_id');
+    }
+
+    /** Every buyer this item is for (inv_item_buyers); buyer_id keeps the first one. */
+    public function buyers(): BelongsToMany
+    {
+        return $this->belongsToMany(InvBuyer::class, 'inv_item_buyers', 'item_id', 'buyer_id')->withTimestamps();
+    }
+
+    /** Buyer names for display — the full list, or the old single buyer. */
+    public function buyerNames(): string
+    {
+        $names = $this->buyers->pluck('name');
+        if ($names->isEmpty() && $this->buyer) {
+            $names = collect([$this->buyer->name]);
+        }
+
+        return $names->implode(', ');
+    }
+
+    public function buyer(): BelongsTo
+    {
+        return $this->belongsTo(InvBuyer::class, 'buyer_id');
+    }
+
+    public function stockTransactions(): HasMany
+    {
+        return $this->hasMany(InvStockTransaction::class, 'item_id');
+    }
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('is_active', true);
+    }
+
+    /**
+     * Items a document form (Purchase Requisition, Store Order, GRN, Store
+     * Requisition, Issue) may offer: only ones with a store assigned — an
+     * item without a store can't be bought, received, requisitioned or
+     * issued until Item Master gives it one. $keepIds keeps items already on
+     * a document being edited, so its existing lines still render.
+     */
+    public function scopeSelectable(Builder $query, iterable $keepIds = []): Builder
+    {
+        $keep = collect($keepIds)->filter()->unique()->values()->all();
+
+        return $query->active()->where(fn ($q) => $q->whereNotNull('opening_store_id')
+            ->when($keep, fn ($q2) => $q2->orWhereIn('id', $keep)));
+    }
+
+    public function scopeOfType(Builder $query, string $type): Builder
+    {
+        return $query->where('item_type', $type);
+    }
+
+    public function isReferenced(): bool
+    {
+        return $this->stockTransactions()->exists();
+    }
+}

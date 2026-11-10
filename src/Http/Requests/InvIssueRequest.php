@@ -1,0 +1,62 @@
+<?php
+
+namespace ME\SflInventory\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
+use ME\SflInventory\Http\Requests\Concerns\PicksMerchandisingStyle;
+use ME\SflInventory\Http\Requests\Concerns\ValidatesItemStore;
+
+class InvIssueRequest extends FormRequest
+{
+    use PicksMerchandisingStyle;
+    use ValidatesItemStore;
+
+    /** Direct issue: Buyer → Style → PO from Merchandising (a requisition's issue inherits them). */
+    protected function prepareForValidation(): void
+    {
+        if (! $this->filled('requisition_id')) {
+            $this->splitLegacyStyle();
+        }
+    }
+
+    public function authorize(): bool
+    {
+        return (bool) $this->user()?->can('inv_issue.add');
+    }
+
+    public function rules(): array
+    {
+        return [
+            // Direct issue (no requisition) is switched off for now — every
+            // issue must be raised against an approved requisition.
+            'requisition_id'              => ['required', 'integer', 'exists:inv_requisitions,id'],
+            'store_id'                    => ['required', 'integer', 'exists:inv_stores,id'],
+            'to_store_id'                 => ['nullable', 'integer', 'different:store_id', 'exists:inv_stores,id'],
+            'department_id'               => ['required', 'integer', 'exists:inv_departments,id'],
+            'buyer_id'                    => ['nullable', 'integer', 'exists:inv_buyers,id'],
+            'style'                       => ['nullable', 'string', 'max:150'],
+            'order_ref'                   => ['nullable', 'string', 'max:150'],
+            'msfl_style_id'                => ['nullable', 'integer'],
+            'msfl_order_po_id'    => ['nullable', 'integer'],
+            'msfl_buyer_id'                => ['nullable', 'integer'],
+            'issue_date'                  => ['required', 'date'],
+            'remarks'                     => ['nullable', 'string'],
+            'items'                       => ['required', 'array', 'min:1'],
+            'items.*.requisition_item_id' => ['nullable', 'integer', 'exists:inv_requisition_items,id'],
+            'items.*.item_id'             => ['required', 'integer', 'exists:inv_items,id'],
+            'items.*.issued_qty'          => ['required', 'numeric', 'min:0.0001'],
+            'items.*.unit_rate'           => ['nullable', 'numeric', 'min:0'],
+        ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $v) {
+            $this->validateItemStores($v, $this->integer('store_id') ?: null);
+            if (! $this->filled('requisition_id') && $this->has('msfl_buyer_id')) {
+                $this->validatePick($v, false);
+            }
+        });
+    }
+}

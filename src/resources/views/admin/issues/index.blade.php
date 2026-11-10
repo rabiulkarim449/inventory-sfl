@@ -1,0 +1,176 @@
+@extends(adminTheme() . 'layouts.app')
+
+@section('title')
+    <title>{{ websiteTitle('Store Issues') }}</title>
+@endsection
+
+@section('contents')
+<div class="flex-grow-1 inv-module">
+    @include('sfl-inventory::admin.partials.alerts')
+    @include('sfl-inventory::admin.partials.ui-kit')
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Store Issues</h4>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="row mb-3 align-items-end">
+                <div class="col-md-3 mb-2">
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Search issue no" value="{{ request('search') }}">
+                </div>
+                <div class="col-md-3 mb-2">
+                    <input type="text" name="requisition_no" class="form-control form-control-sm" placeholder="Search requisition no" value="{{ request('requisition_no') }}">
+                </div>
+                <div class="col-md-3 mb-2">
+                    <select name="department_id" class="form-control form-control-sm inv-select2">
+                        <option value="">All Departments</option>
+                        @foreach($departments as $department)
+                            <option value="{{ $department->id }}" @selected(request('department_id') == $department->id)>{{ $department->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <select name="buyer_id" class="form-control form-control-sm inv-select2">
+                        <option value="">All Buyers</option>
+                        @foreach($buyers as $buyer)
+                            <option value="{{ $buyer->id }}" @selected(request('buyer_id') == $buyer->id)>{{ $buyer->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <select name="store_id" class="form-control form-control-sm inv-select2">
+                        <option value="">All Stores</option>
+                        @foreach($stores as $store)
+                            <option value="{{ $store->id }}" @selected(request('store_id') == $store->id)>{{ $store->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <select name="status" class="form-control form-control-sm inv-select2">
+                        <option value="">All Status</option>
+                        <option value="pending" @selected(request('status') === 'pending')>Pending</option>
+                        <option value="authorized" @selected(request('status') === 'authorized')>Authorized</option>
+                        <option value="approved" @selected(request('status') === 'approved')>Approved</option>
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <input type="date" name="date_from" class="form-control form-control-sm" value="{{ request('date_from') }}" placeholder="From">
+                </div>
+                <div class="col-md-3 mb-2">
+                    <input type="date" name="date_to" class="form-control form-control-sm" value="{{ request('date_to') }}" placeholder="To">
+                </div>
+                <div class="col-md-3 mb-2">
+                    <select name="item_id" class="form-control form-control-sm inv-select2">
+                        <option value="">All Items</option>
+                        @foreach($items as $item)
+                            <option value="{{ $item->id }}" @selected(request('item_id') == $item->id)>{{ $item->item_code }} — {{ $item->item_name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2 d-flex align-items-end flex-wrap gap-1">
+                    <button type="submit" class="btn btn-sm ui-act ui-act-filter" title="Filter"><i class="fa-solid fa-filter"></i> Filter</button>
+                    <a href="{{ route('inventory.issues.index') }}" class="btn btn-sm ui-act ui-act-reset" title="Reset"><i class="fa-solid fa-rotate-left"></i> Reset</a>
+                </div>
+            </form>
+
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm align-middle">
+                    <thead>
+                        <tr><th>#</th><th>Issue No</th><th>Requisition</th><th>Department</th><th>From Store</th><th>To Store</th><th>Buyer / Style</th><th>Date</th><th>Status</th><th>Dept. Receive</th><th class="text-right">Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        @forelse($issues as $issue)
+                            <tr>
+                                <td>{{ $loop->iteration + $issues->firstItem() - 1 }}</td>
+                                <td>{{ $issue->issue_no }}</td>
+                                <td>
+                                    @if($issue->requisition)
+                                        @can('inv_requisition.print')
+                                            <a href="{{ route('inventory.requisitions.print', $issue->requisition) }}" target="_blank">{{ $issue->requisition->requisition_no }}</a>
+                                        @else
+                                            {{ $issue->requisition->requisition_no }}
+                                        @endcan
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                                <td>{{ $issue->department?->name }}</td>
+                                <td>{{ $issue->store?->name }}</td>
+                                <td>{{ $issue->toStore?->name ?? '—' }}</td>
+                                <td>
+                                    {{ $issue->buyer?->name ?? '—' }}
+                                    @if($issue->style)<br><small class="text-muted">{{ $issue->style }}</small>@endif
+                                </td>
+                                <td>{{ $issue->issue_date?->format('d M Y') }}</td>
+                                <td>
+                                    <span class="badge badge-{{ ['pending' => 'secondary', 'authorized' => 'info', 'approved' => 'success'][$issue->status] ?? 'secondary' }}">
+                                        {{ ucfirst($issue->status) }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge badge-{{ ['pending' => 'secondary', 'partial' => 'warning', 'full' => 'success'][$issue->department_receive_status] ?? 'secondary' }}">
+                                        {{ ucfirst($issue->department_receive_status) }}
+                                    </span>
+                                    @if($issue->returned_total > 0)
+                                        <br><span class="badge badge-warning" title="Returned to store">Returned {{ inv_qty($issue->returned_total) }}</span>
+                                    @endif
+                                </td>
+                                <td class="text-right">
+                                    @can('inv_issue.authorize')
+                                        @if($issue->status === 'pending')
+                                            <form action="{{ route('inventory.issues.authorize', $issue) }}" method="POST" class="d-inline">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-icon ui-act ui-act-approve" title="Authorize"><i class="fa-solid fa-check"></i></button>
+                                            </form>
+                                        @endif
+                                    @endcan
+                                    @can('inv_issue.approve')
+                                        @if($issue->status === 'authorized')
+                                            <form action="{{ route('inventory.issues.approve', $issue) }}" method="POST" class="d-inline">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-icon ui-act ui-act-approve" title="Approve & Issue"><i class="fa-solid fa-check"></i></button>
+                                            </form>
+                                        @endif
+                                    @endcan
+                                    @can('inv_issue.delete')
+                                        @if(in_array($issue->status, ['pending', 'authorized']))
+                                            <form action="{{ route('inventory.issues.cancel', $issue) }}" method="POST" class="d-inline" onsubmit="return confirm('Cancel this challan and release the reserved quantity back to the requisition?')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-sm btn-icon ui-act ui-act-cancel" title="Cancel"><i class="fa-solid fa-ban"></i></button>
+                                            </form>
+                                        @endif
+                                    @endcan
+                                    @can('inv_issue.print')
+                                        <a href="{{ route('inventory.issues.print', $issue) }}" target="_blank" class="btn-custom ui-act ui-act-print" title="Print"><i class="fa-solid fa-print"></i></a>
+                                    @endcan
+                                    @can('inv_issue.return')
+                                        @if($issue->status === 'approved' && (float) $issue->returned_total < (float) $issue->issued_total - 0.0001)
+                                            <a href="{{ route('inventory.issue-returns.create', $issue) }}" class="btn btn-sm btn-icon ui-act ui-act-return" title="Return to Store"><i class="fa-solid fa-reply"></i></a>
+                                        @endif
+                                    @endcan
+                                    @can('inv_issue.receive')
+                                        @if($issue->status === 'approved' && $issue->department_receive_status !== 'full')
+                                            <a href="{{ route('inventory.issues.receive-form', $issue) }}" class="btn btn-sm btn-icon ui-act ui-act-receive" title="Confirm Receipt"><i class="fa-solid fa-box-open"></i></a>
+                                        @endif
+                                    @endcan
+                                </td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="11" class="text-center text-muted">No issues found.</td></tr>
+                        @endforelse
+                    </tbody>
+                    @if($issues->total())
+                        <tfoot>
+                            <tr class="font-weight-bold"><td colspan="11">Total: {{ $issues->total() }} challan(s){{ $issues->hasPages() ? ' (all pages)' : '' }}</td></tr>
+                        </tfoot>
+                    @endif
+                </table>
+            </div>
+
+            {{ $issues->links('pagination::bootstrap-5') }}
+        </div>
+    </div>
+</div>
+@include('sfl-inventory::admin.partials.select2-init')
+@endsection

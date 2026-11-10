@@ -1,0 +1,175 @@
+@extends(adminTheme() . 'layouts.app')
+
+@section('title')
+    <title>{{ websiteTitle('Brands') }}</title>
+@endsection
+
+@section('contents')
+<div class="flex-grow-1 inv-module">
+    @include('sfl-inventory::admin.partials.alerts')
+    @include('sfl-inventory::admin.partials.ui-kit')
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Brands</h4>
+            <div>
+                @can('inv_brand.delete')
+                    <button type="button" class="btn btn-sm ui-act ui-act-delete" data-toggle="modal" data-target="#brandTrashModal" title="Trash"><i class="fa-solid fa-trash"></i> Trash<span class="ui-btn-count">{{ $trashedBrands->count() }}</span></button>
+                @endcan
+                @can('inv_brand.add')
+                    <button type="button" class="btn btn-sm ui-act ui-act-create" data-toggle="modal" data-target="#createBrandModal" title="Add Brand"><i class="fa-solid fa-plus"></i> Add Brand</button>
+                @endcan
+            </div>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="row mb-3 align-items-end">
+                <div class="col-md-3 mb-2">
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Search name" value="{{ request('search') }}">
+                </div>
+                <div class="col-md-3 mb-2">
+                    <select name="status" class="form-control form-control-sm inv-select2">
+                        <option value="">All Status</option>
+                        <option value="active" @selected(request('status') === 'active')>Active</option>
+                        <option value="inactive" @selected(request('status') === 'inactive')>Inactive</option>
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2 d-flex align-items-end flex-wrap gap-1">
+                    <button type="submit" class="btn btn-sm ui-act ui-act-filter" title="Filter"><i class="fa-solid fa-filter"></i> Filter</button>
+                    <a href="{{ route('inventory.brands.index') }}" class="btn btn-sm ui-act ui-act-reset" title="Reset"><i class="fa-solid fa-rotate-left"></i> Reset</a>
+                </div>
+            </form>
+
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm align-middle">
+                    <thead>
+                        <tr><th>#</th><th>Name</th><th>Status</th><th class="text-right">Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        @forelse($brands as $brand)
+                            <tr>
+                                <td>{{ $loop->iteration + $brands->firstItem() - 1 }}</td>
+                                <td>{{ $brand->name }}</td>
+                                <td>
+                                    <span class="badge badge-{{ $brand->is_active ? 'success' : 'secondary' }}">
+                                        {{ $brand->is_active ? 'Active' : 'Inactive' }}
+                                    </span>
+                                </td>
+                                <td class="text-right">
+                                    <button type="button" class="btn-custom ui-act ui-act-view" data-toggle="modal" data-target="#viewBrandModal{{ $brand->id }}" title="View"><i class="fa-solid fa-eye"></i></button>
+                                    @can('inv_brand.edit')
+                                        <button type="button" class="btn-custom ui-act ui-act-edit" data-toggle="modal" data-target="#editBrandModal{{ $brand->id }}" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+                                    @endcan
+                                    @can('inv_brand.delete')
+                                        <button type="button" class="btn-custom ui-act ui-act-delete" data-toggle="modal" data-target="#deleteBrandModal" data-action="{{ route('inventory.brands.destroy', $brand) }}" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                                    @endcan
+                                </td>
+                            </tr>
+                            <div class="modal fade" id="viewBrandModal{{ $brand->id }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Brand Details</h5>
+                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <dl class="row mb-0">
+                                                <dt class="col-sm-4">Name</dt><dd class="col-sm-8">{{ $brand->name }}</dd>
+                                                <dt class="col-sm-4">Status</dt>
+                                                <dd class="col-sm-8">
+                                                    <span class="badge badge-{{ $brand->is_active ? 'success' : 'secondary' }}">
+                                                        {{ $brand->is_active ? 'Active' : 'Inactive' }}
+                                                    </span>
+                                                </dd>
+                                            </dl>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-sm ui-act ui-act-cancel" data-dismiss="modal" title="Close"><i class="fa-solid fa-ban"></i> Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            @can('inv_brand.edit')
+                                <div class="modal fade" id="editBrandModal{{ $brand->id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <form method="POST" action="{{ route('inventory.brands.update', $brand) }}">
+                                                @csrf @method('PUT')
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Edit Brand</h5>
+                                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Name <span class="text-danger">*</span></label>
+                                                        <input type="text" name="name" class="form-control form-control-sm" value="{{ $brand->name }}" required>
+                                                    </div>
+                                                    <div class="custom-control custom-switch mb-4">
+                                                        <input type="hidden" name="is_active" value="0">
+                                                        <input type="checkbox" name="is_active" value="1" class="custom-control-input" id="brandActive{{ $brand->id }}" @checked($brand->is_active)>
+                                                        <label class="custom-control-label" for="brandActive{{ $brand->id }}">Active</label>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-sm ui-act ui-act-cancel" data-dismiss="modal" title="Cancel"><i class="fa-solid fa-ban"></i> Cancel</button>
+                                                    <button type="submit" class="btn btn-sm ui-act ui-act-save" title="Update"><i class="fa-solid fa-floppy-disk"></i> Update</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endcan
+                        @empty
+                            <tr><td colspan="4" class="text-center text-muted">No brands found.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            {{ $brands->links('pagination::bootstrap-5') }}
+        </div>
+    </div>
+</div>
+
+@can('inv_brand.add')
+    <div class="modal fade" id="createBrandModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="{{ route('inventory.brands.store') }}">
+                    @csrf
+                    <div class="modal-header">
+                        <h5 class="modal-title">Add Brand</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Name <span class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control form-control-sm" value="{{ old('name') }}" required>
+                        </div>
+                        <div class="custom-control custom-switch mb-4">
+                            <input type="hidden" name="is_active" value="0">
+                            <input type="checkbox" name="is_active" value="1" class="custom-control-input" id="brandActiveNew" checked>
+                            <label class="custom-control-label" for="brandActiveNew">Active</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-sm ui-act ui-act-cancel" data-dismiss="modal" title="Cancel"><i class="fa-solid fa-ban"></i> Cancel</button>
+                        <button type="submit" class="btn btn-sm ui-act ui-act-save" title="Save"><i class="fa-solid fa-floppy-disk"></i> Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+@endcan
+
+@include('sfl-inventory::admin.partials.delete-confirm-modal', ['modalId' => 'deleteBrandModal', 'label' => 'brand'])
+@include('sfl-inventory::admin.partials.trash-modal', [
+    'modalId' => 'brandTrashModal',
+    'label' => 'Brand',
+    'rows' => $trashedBrands,
+    'restoreRoute' => 'inventory.brands.restore',
+    'forceRoute' => 'inventory.brands.force-destroy',
+    'canRestore' => auth()->user()->can('inv_brand.delete'),
+    'canForce' => auth()->user()->can('inv_brand.force_delete'),
+])
+@include('sfl-inventory::admin.partials.select2-init')
+@endsection

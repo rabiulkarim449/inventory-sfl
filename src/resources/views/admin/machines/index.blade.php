@@ -1,0 +1,184 @@
+@extends(adminTheme() . 'layouts.app')
+
+@section('title')
+    <title>{{ websiteTitle('Machines') }}</title>
+@endsection
+
+@section('contents')
+<div class="flex-grow-1 inv-module">
+    @include('sfl-inventory::admin.partials.alerts')
+    @include('sfl-inventory::admin.partials.ui-kit')
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Machines</h4>
+            <div>
+                @can('inv_machine.delete')
+                    <button type="button" class="btn btn-sm ui-act ui-act-delete" data-toggle="modal" data-target="#machineTrashModal" title="Trash"><i class="fa-solid fa-trash"></i> Trash<span class="ui-btn-count">{{ $trashedMachines->count() }}</span></button>
+                @endcan
+                @can('inv_machine.add')
+                    <button type="button" class="btn btn-sm ui-act ui-act-create" data-toggle="modal" data-target="#createMachineModal" title="Add Machine"><i class="fa-solid fa-plus"></i> Add Machine</button>
+                @endcan
+            </div>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="row mb-3 align-items-end">
+                <div class="col-md-3 mb-2">
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Search name or code" value="{{ request('search') }}">
+                </div>
+                <div class="col-md-3 mb-2">
+                    <select name="department_id" class="form-control form-control-sm inv-select2">
+                        <option value="">All Departments</option>
+                        @foreach($departments as $department)
+                            <option value="{{ $department->id }}" @selected(request('department_id') == $department->id)>{{ $department->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <select name="status" class="form-control form-control-sm inv-select2">
+                        <option value="">All Status</option>
+                        <option value="active" @selected(request('status') === 'active')>Active</option>
+                        <option value="inactive" @selected(request('status') === 'inactive')>Inactive</option>
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2 d-flex align-items-end flex-wrap gap-1">
+                    <button type="submit" class="btn btn-sm ui-act ui-act-filter" title="Filter"><i class="fa-solid fa-filter"></i> Filter</button>
+                    <a href="{{ route('inventory.machines.index') }}" class="btn btn-sm ui-act ui-act-reset" title="Reset"><i class="fa-solid fa-rotate-left"></i> Reset</a>
+                </div>
+            </form>
+
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm align-middle">
+                    <thead>
+                        <tr><th>#</th><th>Name</th><th>Code</th><th>Machine No</th><th>Model</th><th>Type</th><th>Department</th><th>Section</th><th>Line</th><th>Status</th><th class="text-right">Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        @forelse($machines as $machine)
+                            <tr>
+                                <td>{{ $loop->iteration + $machines->firstItem() - 1 }}</td>
+                                <td>{{ $machine->name }}</td>
+                                <td>{{ $machine->code }}</td>
+                                <td>{{ $machine->machine_no }}</td>
+                                <td>{{ $machine->model }}</td>
+                                <td>{{ $machine->type }}</td>
+                                <td>{{ $machine->department?->name ?? '—' }}</td>
+                                <td>{{ $machine->section }}</td>
+                                <td>{{ $machine->line }}</td>
+                                <td>
+                                    <span class="badge badge-{{ $machine->is_active ? 'success' : 'secondary' }}">
+                                        {{ $machine->is_active ? 'Active' : 'Inactive' }}
+                                    </span>
+                                </td>
+                                <td class="text-right">
+                                    <button type="button" class="btn-custom ui-act ui-act-view" data-toggle="modal" data-target="#viewMachineModal{{ $machine->id }}" title="View"><i class="fa-solid fa-eye"></i></button>
+                                    @can('inv_machine.edit')
+                                        <button type="button" class="btn-custom ui-act ui-act-edit" data-toggle="modal" data-target="#editMachineModal{{ $machine->id }}" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+                                    @endcan
+                                    @can('inv_machine.delete')
+                                        <button type="button" class="btn-custom ui-act ui-act-delete" data-toggle="modal" data-target="#deleteMachineModal" data-action="{{ route('inventory.machines.destroy', $machine) }}" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                                    @endcan
+                                </td>
+                            </tr>
+                            <div class="modal fade" id="viewMachineModal{{ $machine->id }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Machine Details</h5>
+                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <dl class="row mb-0">
+                                                <dt class="col-sm-4">Name</dt><dd class="col-sm-8">{{ $machine->name }}</dd>
+                                                <dt class="col-sm-4">Code</dt><dd class="col-sm-8">{{ $machine->code }}</dd>
+                                                <dt class="col-sm-4">Machine No</dt><dd class="col-sm-8">{{ $machine->machine_no ?? '—' }}</dd>
+                                                <dt class="col-sm-4">Model</dt><dd class="col-sm-8">{{ $machine->model ?? '—' }}</dd>
+                                                <dt class="col-sm-4">Origin</dt><dd class="col-sm-8">{{ $machine->origin ?? '—' }}</dd>
+                                                <dt class="col-sm-4">Type</dt><dd class="col-sm-8">{{ $machine->type ?? '—' }}</dd>
+                                                <dt class="col-sm-4">Color</dt><dd class="col-sm-8">{{ $machine->color ?? '—' }}</dd>
+                                                <dt class="col-sm-4">Department</dt><dd class="col-sm-8">{{ $machine->department?->name ?? '—' }}</dd>
+                                                <dt class="col-sm-4">Section</dt><dd class="col-sm-8">{{ $machine->section ?? '—' }}</dd>
+                                                <dt class="col-sm-4">Line</dt><dd class="col-sm-8">{{ $machine->line ?? '—' }}</dd>
+                                                <dt class="col-sm-4">Description</dt><dd class="col-sm-8">{{ $machine->description ?? '—' }}</dd>
+                                                <dt class="col-sm-4">Status</dt>
+                                                <dd class="col-sm-8">
+                                                    <span class="badge badge-{{ $machine->is_active ? 'success' : 'secondary' }}">
+                                                        {{ $machine->is_active ? 'Active' : 'Inactive' }}
+                                                    </span>
+                                                </dd>
+                                            </dl>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-sm ui-act ui-act-cancel" data-dismiss="modal" title="Close"><i class="fa-solid fa-ban"></i> Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            @can('inv_machine.edit')
+                                <div class="modal fade" id="editMachineModal{{ $machine->id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-lg">
+                                        <div class="modal-content">
+                                            <form method="POST" action="{{ route('inventory.machines.update', $machine) }}">
+                                                @csrf @method('PUT')
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Edit Machine</h5>
+                                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    @include('sfl-inventory::admin.machines.partials.fields', ['machine' => $machine, 'departments' => $departments])
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-sm ui-act ui-act-cancel" data-dismiss="modal" title="Cancel"><i class="fa-solid fa-ban"></i> Cancel</button>
+                                                    <button type="submit" class="btn btn-sm ui-act ui-act-save" title="Update"><i class="fa-solid fa-floppy-disk"></i> Update</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endcan
+                        @empty
+                            <tr><td colspan="11" class="text-center text-muted">No machines found.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            {{ $machines->links('pagination::bootstrap-5') }}
+        </div>
+    </div>
+</div>
+
+@can('inv_machine.add')
+    <div class="modal fade" id="createMachineModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form method="POST" action="{{ route('inventory.machines.store') }}">
+                    @csrf
+                    <div class="modal-header">
+                        <h5 class="modal-title">Add Machine</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    </div>
+                    <div class="modal-body">
+                        @include('sfl-inventory::admin.machines.partials.fields', ['machine' => null, 'departments' => $departments])
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-sm ui-act ui-act-cancel" data-dismiss="modal" title="Cancel"><i class="fa-solid fa-ban"></i> Cancel</button>
+                        <button type="submit" class="btn btn-sm ui-act ui-act-save" title="Save"><i class="fa-solid fa-floppy-disk"></i> Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+@endcan
+
+@include('sfl-inventory::admin.partials.delete-confirm-modal', ['modalId' => 'deleteMachineModal', 'label' => 'machine'])
+@include('sfl-inventory::admin.partials.trash-modal', [
+    'modalId' => 'machineTrashModal',
+    'label' => 'Machine',
+    'rows' => $trashedMachines,
+    'restoreRoute' => 'inventory.machines.restore',
+    'forceRoute' => 'inventory.machines.force-destroy',
+    'canRestore' => auth()->user()->can('inv_machine.delete'),
+    'canForce' => auth()->user()->can('inv_machine.force_delete'),
+])
+@include('sfl-inventory::admin.partials.select2-init')
+@endsection

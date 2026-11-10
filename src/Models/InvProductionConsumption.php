@@ -1,0 +1,55 @@
+<?php
+
+namespace ME\SflInventory\Models;
+
+use App\Models\User;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Traits\HasAudit;
+
+class InvProductionConsumption extends Model
+{
+    use HasAudit;
+    use HasFactory;
+    use SoftDeletes;
+
+    protected $table = 'inv_production_consumptions';
+
+    protected $fillable = [
+        'consumption_no', 'department_id', 'issue_id', 'style', 'order_ref', 'consumption_date',
+        'store_id', 'remarks', 'created_by',
+        'msfl_style_id', 'msfl_order_po_id', 'msfl_buyer_id',
+    ];
+
+    protected $casts = [
+        'consumption_date' => 'date',
+    ];
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(InvDepartment::class, 'department_id');
+    }
+
+    public function issue(): BelongsTo
+    {
+        return $this->belongsTo(InvIssue::class, 'issue_id');
+    }
+
+    public function store(): BelongsTo
+    {
+        return $this->belongsTo(InvStore::class, 'store_id');
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(InvProductionConsumptionItem::class, 'consumption_id');
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+}

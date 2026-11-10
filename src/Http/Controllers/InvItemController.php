@@ -1,0 +1,351 @@
+<?php
+
+namespace ME\SflInventory\Http\Controllers;
+
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
+use ME\SflInventory\Exports\InvReportExport;
+use Maatwebsite\Excel\Facades\Excel;
+use ME\SflInventory\Http\Requests\InvItemMergeRequest;
+use ME\SflInventory\Http\Requests\InvItemRequest;
+use ME\SflInventory\Models\InvBrand;
+use ME\SflInventory\Models\InvBuyer;
+use ME\SflInventory\Models\InvColor;
+use ME\SflInventory\Models\InvDepartment;
+use ME\SflInventory\Models\InvItem;
+use ME\SflInventory\Models\InvItemCategory;
+use ME\SflInventory\Models\InvRequisitionItem;
+use ME\SflInventory\Models\InvSize;
+use ME\SflInventory\Models\InvStore;
+use ME\SflInventory\Models\InvSupplier;
+use ME\SflInventory\Models\InvUnit;
+use ME\SflInventory\Services\StockService;
+
+class InvItemController extends Controller
+{
+    public function __construct(private readonly StockService $stock)
+    {
+    }
+
+    public function index(Request $request): View
+    {
+        $this->authorize('inv_item.list');
+
+        $items = $this->filteredItems($request)
+            ->latest('id')
+            ->paginate(20)
+            ->withQueryString();
+
+        $categories = InvItemCategory::active()->orderBy('name')->get();
+        $departments = InvDepartment::active()->orderBy('name')->get();
+        $suppliers = InvSupplier::active()->orderBy('name')->get();
+        $units = InvUnit::active()->orderBy('name')->get();
+        $stores = InvStore::active()->orderBy('name')->get();
+        $buyers = InvBuyer::active()->orderBy('name')->get();
+        $filterItems = InvItem::orderBy('item_name')->get(['id', 'item_code', 'item_name']);
+
+        $trashedItems = InvItem::onlyTrashed()->latest('deleted_at')->get()
+            ->map(fn ($item) => ['id' => $item->id, 'title' => $item->item_code . ' — ' . $item->item_name, 'subtitle' => null, 'deleted_at' => $item->deleted_at]);
+
+        return view('sfl-inventory::admin.items.index', compact('items', 'filterItems', 'categories', 'departments', 'suppliers', 'units', 'stores', 'buyers', 'trashedItems'));
+    }
+
+    /** Item list Print (printMaster2) — same filters as the list, every row. */
+    public function print(Request $request): View
+    {
+        $this->authorize('inv_item.export');
+
+        return $this->printView($request);
+    }
+
+    /** Item list Excel download — the print view's table, same filters. */
+    public function export(Request $request)
+    {
+        $this->authorize('inv_item.export');
+
+        $request->merge(['print' => 1, 'excel_export' => 1]);
+
+        return Excel::download(new InvReportExport($this->printView($request), 'Item Master'), 'item-master-' . now()->format('Y-m-d') . '.xlsx');
+    }
+
+    private function printView(Request $request): View
+    {
+        $items = $this->filteredItems($request)->orderBy('item_code')->get();
+
+        $stock = DB::table('inv_stock_transactions')
+            ->whereIn('item_id', $items->pluck('id'))
+            ->groupBy('item_id')
+            ->selectRaw('item_id, SUM(qty_in) - SUM(qty_out) as balance')
+            ->pluck('balance', 'item_id');
+
+        return view('sfl-inventory::admin.items.print', ['items' => $items, 'stock' => $stock, 'printMode' => true]);
+    }
+
+    /** The Item Master list query with every list filter applied — shared by the list, Print and Excel. */
+    private function filteredItems(Request $request)
+    {
+        return InvItem::query()
+            ->with(['category', 'unit', 'brand', 'color', 'size', 'department', 'supplier', 'buyer', 'buyers', 'openingStore'])
+            ->when($request->filled('item_id'), fn ($q) => $q->whereKey($request->item_id))
+            ->when($request->filled('item_code'), fn ($q) => $q->where('item_code', 'like', '%' . $request->item_code . '%'))
+            ->when($request->filled('item_name'), fn ($q) => $q->where('item_name', 'like', '%' . $request->item_name . '%'))
+            ->when($request->filled('category_id'), fn ($q) => $q->where('category_id', $request->category_id))
+            ->when($request->filled('unit_id'), fn ($q) => $q->where('unit_id', $request->unit_id))
+            ->when($request->filled('department_id'), fn ($q) => $q->where('department_id', $request->department_id))
+            ->when($request->filled('supplier_id'), fn ($q) => $q->where('supplier_id', $request->supplier_id))
+            ->when($request->filled('buyer_id'), fn ($q) => $q->where(fn ($q2) => $q2->where('buyer_id', $request->buyer_id)
+                ->orWhereHas('buyers', fn ($b) => $b->where('inv_buyers.id', $request->buyer_id))))
+            ->when($request->input('store_id') === 'none', fn ($q) => $q->whereNull('opening_store_id'))
+            ->when($request->filled('store_id') && $request->input('store_id') !== 'none', fn ($q) => $q->where('opening_store_id', $request->store_id))
+            ->when($request->filled('item_type'), fn ($q) => $q->where('item_type', $request->item_type))
+            ->when($request->filled('status'), fn ($q) => $q->where('is_active', $request->status === 'active'));
+    }
+
+    public function create(): View
+    {
+        $this->authorize('inv_item.add');
+
+        return view('sfl-inventory::admin.items.create', $this->formOptions());
+    }
+
+    public function store(InvItemRequest $request): RedirectResponse
+    {
+        $data = $request->validated();
+        $data['created_by'] = auth()->id();
+        $item = DB::transaction(function () use ($data) {
+            $item = InvItem::create($data);
+            if (array_key_exists('buyer_ids', $data)) {
+                $item->buyers()->sync($data['buyer_ids'] ?? []);
+            }
+
+            return $item;
+        });
+
+        return redirect()->route('inventory.items.index')->with('success', "Item {$item->item_code} created successfully.");
+    }
+
+    public function edit(InvItem $item): View
+    {
+        $this->authorize('inv_item.edit');
+
+        return view('sfl-inventory::admin.items.edit', ['item' => $item] + $this->formOptions());
+    }
+
+    public function update(InvItemRequest $request, InvItem $item): RedirectResponse
+    {
+        $data = $request->validated();
+        $oldStoreId = $item->opening_store_id ? (int) $item->opening_store_id : null;
+        $newStoreId = ! empty($data['opening_store_id']) ? (int) $data['opening_store_id'] : null;
+        $storeChanged = $newStoreId !== null && $newStoreId !== $oldStoreId;
+
+        $moved = DB::transaction(function () use ($item, $data, $storeChanged, $newStoreId) {
+            $item->update($data);
+            if (array_key_exists('buyer_ids', $data)) {
+                $item->buyers()->sync($data['buyer_ids'] ?? []);
+            }
+
+            return $storeChanged ? $this->stock->moveItemHistoryToStore($item, $newStoreId) : 0;
+        });
+
+        $message = 'Item updated successfully.';
+        if ($storeChanged) {
+            $storeName = InvStore::find($newStoreId)?->name;
+            $message = "Item updated. Store changed to {$storeName}" . ($moved ? " — {$moved} ledger entr" . ($moved === 1 ? 'y' : 'ies') . " moved with it; every report now shows the item's stock there (quantity unchanged)." : '.');
+
+            $openRequisitions = InvRequisitionItem::where('item_id', $item->id)
+                ->whereHas('requisition', fn ($q) => $q->where('store_id', '!=', $newStoreId)->whereIn('status', ['pending', 'approved', 'partially_issued']))
+                ->count();
+            if ($openRequisitions) {
+                $message .= " Note: {$openRequisitions} open requisition line(s) still point at the old store.";
+            }
+        }
+
+        return redirect()->route('inventory.items.index')->with('success', $message);
+    }
+
+    public function destroy(InvItem $item): RedirectResponse
+    {
+        $this->authorize('inv_item.delete');
+
+        if ($item->isReferenced()) {
+            return back()->with('error', 'This item has stock movements and cannot be deleted.');
+        }
+
+        $item->delete();
+
+        return back()->with('success', 'Item deleted successfully.');
+    }
+
+    public function mergeForm(): View
+    {
+        $this->authorize('inv_item.merge');
+
+        $items = InvItem::with('unit')->orderBy('item_name')->get();
+
+        return view('sfl-inventory::admin.items.merge', compact('items'));
+    }
+
+    /**
+     * Folds one or more duplicate items into a single "keep" item: every
+     * document line that pointed at a duplicate (GRN, PO, requisition,
+     * issue, stock transactions, etc. — every inv_items-referencing table
+     * this package knows about, the same set forceDestroy() checks against)
+     * is repointed at the surviving item, then the duplicate is soft-deleted
+     * — its stock history now lives entirely under the surviving item, so a
+     * plain delete() (not force) is enough and it stays recoverable from
+     * Trash if this was a mistake (though restoring it won't move the
+     * history back).
+     */
+    public function merge(InvItemMergeRequest $request): RedirectResponse
+    {
+        $data = $request->validated();
+
+        $survivor = InvItem::with('unit')->findOrFail($data['keep_item_id']);
+        $duplicates = InvItem::with('unit')->whereIn('id', $data['duplicate_item_ids'])->get();
+
+        // Quantities are just numbers in the stock ledger — merging an item
+        // that's actually tracked in a different unit would silently mix
+        // e.g. "kg" balances into a "pcs" item's total.
+        foreach ($duplicates as $duplicate) {
+            if ($duplicate->unit_id !== $survivor->unit_id) {
+                return back()->withInput()->with('error',
+                    "\"{$duplicate->item_code} — {$duplicate->item_name}\" is tracked in " . ($duplicate->unit?->short_name ?? 'a different unit') .
+                    ", but \"{$survivor->item_code} — {$survivor->item_name}\" is tracked in " . ($survivor->unit?->short_name ?? 'a different unit') .
+                    ' — merging would mix incompatible quantities. Fix the unit on one of them first, or pick a different pair.'
+                );
+            }
+        }
+
+        $mergedLabel = $duplicates->map(fn ($d) => $d->item_code)->implode(', ');
+
+        DB::transaction(function () use ($survivor, $duplicates) {
+            foreach ($duplicates as $duplicate) {
+                foreach (self::itemReferencingTables() as $table) {
+                    DB::table($table)->where('item_id', $duplicate->id)->update(['item_id' => $survivor->id]);
+                }
+
+                $duplicate->update(['is_active' => false]);
+                $duplicate->delete();
+            }
+        });
+
+        return redirect()->route('inventory.items.index')
+            ->with('success', "Merged {$mergedLabel} into {$survivor->item_code} — all history moved over and the duplicate" . ($duplicates->count() > 1 ? 's were' : ' was') . ' deleted.');
+    }
+
+    /**
+     * Every table this package knows about that stores a real inv_items.id
+     * foreign key — kept as one list so merge() (repoint) and forceDestroy()
+     * (block-and-check) can't drift out of sync with each other or with the
+     * migrations that actually create these columns.
+     */
+    private static function itemReferencingTables(): array
+    {
+        return [
+            'inv_stock_transactions',
+            'inv_purchase_requisition_items',
+            'inv_purchase_order_items',
+            'inv_grn_items',
+            'inv_requisition_items',
+            'inv_issue_items',
+            'inv_issue_return_items',
+            'inv_stock_transfer_items',
+            'inv_production_consumption_items',
+            'inv_finished_goods_receive_items',
+            'inv_gate_pass_items',
+            'inv_shipment_items',
+            'inv_stock_adjustment_items',
+        ];
+    }
+
+    public function restore(InvItem $item): RedirectResponse
+    {
+        $this->authorize('inv_item.delete');
+
+        $item->restore();
+
+        return back()->with('success', 'Item restored successfully.');
+    }
+
+    /**
+     * Wipes the item's stock ledger (inv_stock_transactions) and permanently
+     * removes the item itself — for cleaning up test/junk items that were
+     * never part of a real GRN/requisition/issue/etc. Checked explicitly
+     * against every document line-item table rather than relying on their
+     * `restrictOnDelete()` foreign keys to block it: this database has rows
+     * whose FK constraints don't actually exist (verified via
+     * information_schema — a pre-existing gap, not something this method
+     * should ever depend on for safety).
+     */
+    public function forceDestroy(InvItem $item): RedirectResponse
+    {
+        $this->authorize('inv_item.force_delete');
+
+        $referencingTables = [
+            'GRN'                      => 'inv_grn_items',
+            'Purchase Requisition'     => 'inv_purchase_requisition_items',
+            'Purchase Order'           => 'inv_purchase_order_items',
+            'Requisition'              => 'inv_requisition_items',
+            'Issue'                    => 'inv_issue_items',
+            'Issue Return'             => 'inv_issue_return_items',
+            'Stock Transfer'           => 'inv_stock_transfer_items',
+            'Production Consumption'   => 'inv_production_consumption_items',
+            'Finished Goods Receive'   => 'inv_finished_goods_receive_items',
+            'Gate Pass'                => 'inv_gate_pass_items',
+            'Shipment'                 => 'inv_shipment_items',
+            'Stock Adjustment'         => 'inv_stock_adjustment_items',
+        ];
+
+        foreach ($referencingTables as $label => $table) {
+            if (DB::table($table)->where('item_id', $item->id)->exists()) {
+                return back()->with('error', "Cannot force delete: this item is used on a real {$label} document. Remove that document first.");
+            }
+        }
+
+        DB::transaction(function () use ($item) {
+            $item->stockTransactions()->delete();
+            $item->forceDelete();
+        });
+
+        return back()->with('success', 'Item and its stock history permanently deleted.');
+    }
+
+    /**
+     * Gated behind the standalone "Barcode System" permission (not
+     * inv_item.*) since the same permission also unlocks scan-to-receive on
+     * the GRN screens — one flag for the whole feature, per the spec's
+     * "permission thakle use hobe na hole hobe na" requirement. Only items
+     * explicitly opted in (barcode_enabled) get one generated; this is the
+     * "user tar posondomoto product e barcode generate korte parbe" part —
+     * small/loose items can be left off.
+     */
+    public function generateBarcode(InvItem $item): RedirectResponse
+    {
+        $this->authorize('inv_barcode.use');
+
+        if (! $item->barcode_enabled) {
+            return back()->with('error', 'Enable barcode for this item first (Edit → Enable Barcode), then generate it.');
+        }
+
+        $item->update(['barcode' => config('sfl-inventory.document_prefixes.company', 'SFL') . str_pad((string) $item->id, 9, '0', STR_PAD_LEFT)]);
+
+        return back()->with('success', "Barcode generated: {$item->barcode}");
+    }
+
+    private function formOptions(): array
+    {
+        return [
+            'categories'  => InvItemCategory::active()->orderBy('name')->get(),
+            'units'       => InvUnit::active()->orderBy('name')->get(),
+            'brands'      => InvBrand::active()->orderBy('name')->get(),
+            'colors'      => InvColor::active()->orderBy('name')->get(),
+            'sizes'       => InvSize::active()->ordered()->get(),
+            'stores'      => InvStore::active()->orderBy('name')->get(),
+            'departments' => InvDepartment::active()->orderBy('name')->get(),
+            'suppliers'   => InvSupplier::active()->orderBy('name')->get(),
+            'buyers'      => InvBuyer::active()->orderBy('name')->get(),
+        ] + app(\ME\SflInventory\Services\MerchandisingLink::class)->formOptions();
+    }
+}

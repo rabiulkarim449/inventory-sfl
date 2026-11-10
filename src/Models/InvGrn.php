@@ -1,0 +1,80 @@
+<?php
+
+namespace ME\SflInventory\Models;
+
+use App\Models\User;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Traits\HasAudit;
+
+class InvGrn extends Model
+{
+    use HasAudit;
+    use HasFactory;
+    use SoftDeletes;
+
+    protected $table = 'inv_grns';
+
+    protected $fillable = [
+        'grn_number', 'purchase_order_id', 'source_type', 'store_id', 'supplier_id', 'buyer_id', 'style', 'order_ref',
+        'challan_invoice_no', 'receive_date', 'status', 'approved_by', 'approved_at', 'approval_remarks',
+        'total_amount', 'remarks', 'created_by', 'received_by',
+        'msfl_style_id', 'msfl_order_po_id', 'msfl_buyer_id',
+    ];
+
+    protected $casts = [
+        'receive_date' => 'date',
+        'approved_at'  => 'datetime',
+        'total_amount' => 'decimal:2',
+    ];
+
+    public function purchaseOrder(): BelongsTo
+    {
+        return $this->belongsTo(InvPurchaseOrder::class, 'purchase_order_id');
+    }
+
+    public function store(): BelongsTo
+    {
+        return $this->belongsTo(InvStore::class, 'store_id');
+    }
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(InvSupplier::class, 'supplier_id');
+    }
+
+    public function buyer(): BelongsTo
+    {
+        return $this->belongsTo(InvBuyer::class, 'buyer_id');
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(InvGrnItem::class, 'grn_id');
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    /**
+     * The HR employee who physically received the challan — guarded with
+     * class_exists() so this package doesn't hard-depend on hr-new being
+     * installed, same pattern as InvBrokenNeedle::employee().
+     */
+    public function receiver(): BelongsTo
+    {
+        $employeeClass = class_exists(\ME\Hr\Models\HrEmployee::class) ? \ME\Hr\Models\HrEmployee::class : self::class;
+
+        return $this->belongsTo($employeeClass, 'received_by');
+    }
+}

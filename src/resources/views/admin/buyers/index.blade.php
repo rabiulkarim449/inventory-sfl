@@ -1,0 +1,164 @@
+@extends(adminTheme() . 'layouts.app')
+
+@section('title')
+    <title>{{ websiteTitle('Buyers') }}</title>
+@endsection
+
+@section('contents')
+<div class="flex-grow-1 inv-module">
+    @include('sfl-inventory::admin.partials.alerts')
+    @include('sfl-inventory::admin.partials.ui-kit')
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Buyers</h4>
+            <div>
+                @can('inv_buyer.delete')
+                    <button type="button" class="btn btn-sm ui-act ui-act-delete" data-toggle="modal" data-target="#buyerTrashModal" title="Trash"><i class="fa-solid fa-trash"></i> Trash<span class="ui-btn-count">{{ $trashedBuyers->count() }}</span></button>
+                @endcan
+                @can('inv_buyer.add')
+                    <button type="button" class="btn btn-sm ui-act ui-act-create" data-toggle="modal" data-target="#createBuyerModal" title="Add Buyer"><i class="fa-solid fa-plus"></i> Add Buyer</button>
+                @endcan
+            </div>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="row mb-3 align-items-end">
+                <div class="col-md-3 mb-2">
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Search name or code" value="{{ request('search') }}">
+                </div>
+                <div class="col-md-3 mb-2">
+                    <select name="status" class="form-control form-control-sm inv-select2">
+                        <option value="">All Status</option>
+                        <option value="active" @selected(request('status') === 'active')>Active</option>
+                        <option value="inactive" @selected(request('status') === 'inactive')>Inactive</option>
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2 d-flex align-items-end flex-wrap gap-1">
+                    <button type="submit" class="btn btn-sm ui-act ui-act-filter" title="Filter"><i class="fa-solid fa-filter"></i> Filter</button>
+                    <a href="{{ route('inventory.buyers.index') }}" class="btn btn-sm ui-act ui-act-reset" title="Reset"><i class="fa-solid fa-rotate-left"></i> Reset</a>
+                </div>
+            </form>
+
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm align-middle">
+                    <thead>
+                        <tr><th>#</th><th>Name</th><th>Code</th><th>Contact</th><th>Status</th><th class="text-right">Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        @forelse($buyers as $buyer)
+                            <tr>
+                                <td>{{ $loop->iteration + $buyers->firstItem() - 1 }}</td>
+                                <td>{{ $buyer->name }}</td>
+                                <td>{{ $buyer->code }}</td>
+                                <td>{{ $buyer->contact }}</td>
+                                <td>
+                                    <span class="badge badge-{{ $buyer->is_active ? 'success' : 'secondary' }}">
+                                        {{ $buyer->is_active ? 'Active' : 'Inactive' }}
+                                    </span>
+                                </td>
+                                <td class="text-right">
+                                    <button type="button" class="btn-custom ui-act ui-act-view" data-toggle="modal" data-target="#viewBuyerModal{{ $buyer->id }}" title="View"><i class="fa-solid fa-eye"></i></button>
+                                    @can('inv_buyer.edit')
+                                        <button type="button" class="btn-custom ui-act ui-act-edit" data-toggle="modal" data-target="#editBuyerModal{{ $buyer->id }}" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+                                    @endcan
+                                    @can('inv_buyer.delete')
+                                        <button type="button" class="btn-custom ui-act ui-act-delete" data-toggle="modal" data-target="#deleteBuyerModal" data-action="{{ route('inventory.buyers.destroy', $buyer) }}" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                                    @endcan
+                                </td>
+                            </tr>
+                            <div class="modal fade" id="viewBuyerModal{{ $buyer->id }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Buyer Details</h5>
+                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <dl class="row mb-0">
+                                                <dt class="col-sm-4">Name</dt><dd class="col-sm-8">{{ $buyer->name }}</dd>
+                                                <dt class="col-sm-4">Code</dt><dd class="col-sm-8">{{ $buyer->code }}</dd>
+                                                <dt class="col-sm-4">Contact</dt><dd class="col-sm-8">{{ $buyer->contact ?: '—' }}</dd>
+                                                <dt class="col-sm-4">Address</dt><dd class="col-sm-8">{{ $buyer->address ?: '—' }}</dd>
+                                                <dt class="col-sm-4">Status</dt>
+                                                <dd class="col-sm-8">
+                                                    <span class="badge badge-{{ $buyer->is_active ? 'success' : 'secondary' }}">
+                                                        {{ $buyer->is_active ? 'Active' : 'Inactive' }}
+                                                    </span>
+                                                </dd>
+                                            </dl>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-sm ui-act ui-act-cancel" data-dismiss="modal" title="Close"><i class="fa-solid fa-ban"></i> Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            @can('inv_buyer.edit')
+                                <div class="modal fade" id="editBuyerModal{{ $buyer->id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-lg">
+                                        <div class="modal-content">
+                                            <form method="POST" action="{{ route('inventory.buyers.update', $buyer) }}">
+                                                @csrf @method('PUT')
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Edit Buyer</h5>
+                                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    @include('sfl-inventory::admin.buyers.partials.fields', ['buyer' => $buyer])
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-sm ui-act ui-act-cancel" data-dismiss="modal" title="Cancel"><i class="fa-solid fa-ban"></i> Cancel</button>
+                                                    <button type="submit" class="btn btn-sm ui-act ui-act-save" title="Update"><i class="fa-solid fa-floppy-disk"></i> Update</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endcan
+                        @empty
+                            <tr><td colspan="6" class="text-center text-muted">No buyers found.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            {{ $buyers->links('pagination::bootstrap-5') }}
+        </div>
+    </div>
+</div>
+
+@can('inv_buyer.add')
+    <div class="modal fade" id="createBuyerModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form method="POST" action="{{ route('inventory.buyers.store') }}">
+                    @csrf
+                    <div class="modal-header">
+                        <h5 class="modal-title">Add Buyer</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    </div>
+                    <div class="modal-body">
+                        @include('sfl-inventory::admin.buyers.partials.fields', ['buyer' => null])
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-sm ui-act ui-act-cancel" data-dismiss="modal" title="Cancel"><i class="fa-solid fa-ban"></i> Cancel</button>
+                        <button type="submit" class="btn btn-sm ui-act ui-act-save" title="Save"><i class="fa-solid fa-floppy-disk"></i> Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+@endcan
+
+@include('sfl-inventory::admin.partials.delete-confirm-modal', ['modalId' => 'deleteBuyerModal', 'label' => 'buyer'])
+@include('sfl-inventory::admin.partials.trash-modal', [
+    'modalId' => 'buyerTrashModal',
+    'label' => 'Buyer',
+    'rows' => $trashedBuyers,
+    'restoreRoute' => 'inventory.buyers.restore',
+    'forceRoute' => 'inventory.buyers.force-destroy',
+    'canRestore' => auth()->user()->can('inv_buyer.delete'),
+    'canForce' => auth()->user()->can('inv_buyer.force_delete'),
+])
+@include('sfl-inventory::admin.partials.select2-init')
+@endsection

@@ -1,0 +1,75 @@
+@extends(adminTheme() . 'layouts.app')
+
+@section('title')
+    <title>{{ websiteTitle('Receive Approval') }}</title>
+@endsection
+
+@section('contents')
+<div class="flex-grow-1 inv-module">
+    @include('sfl-inventory::admin.partials.alerts')
+    @include('sfl-inventory::admin.partials.ui-kit')
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Receive Approval — {{ $grn->grn_number }}</h4>
+            <a href="{{ route('inventory.grns.index') }}" class="btn btn-sm ui-act ui-act-back" title="Back"><i class="fa-solid fa-arrow-left"></i> Back</a>
+        </div>
+        <div class="card-body">
+            <p>
+                <strong>PO Number:</strong> {{ $grn->purchaseOrder?->po_number ?? '—' }} &nbsp;|&nbsp;
+                <strong>Store:</strong> {{ $grn->store?->name }} &nbsp;|&nbsp;
+                <strong>Supplier:</strong> {{ $grn->supplier?->name ?? '—' }} &nbsp;|&nbsp;
+                <strong>Receive Date:</strong> {{ $grn->receive_date?->format('d M Y') }}
+                <br><strong>Invoice / Challan No.:</strong> {{ $grn->challan_invoice_no ?? '—' }} &nbsp;|&nbsp;
+                <strong>Prepared By:</strong> {{ $grn->creator?->name ?? '—' }}
+            </p>
+
+            <form method="POST" action="{{ route('inventory.grns.approval', $grn) }}">
+                @csrf
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>Item</th><th>Unit</th><th>Color</th><th>Size</th><th class="text-right">Received Qty</th>
+                                <th class="text-right">Rate</th><th class="text-right">Amount</th><th>Lot No</th><th>Batch No</th><th>Expiry Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($grn->items as $item)
+                                <tr>
+                                    <td>{{ $item->item?->item_code }} — {{ $item->item?->item_name }}</td>
+                                    <td>{{ $item->item?->unit?->short_name }}</td>
+                                    <td>{{ $item->color?->name ?? '—' }}</td>
+                                    <td>{{ $item->size?->name ?? '—' }}</td>
+                                    <td class="text-right">{{ inv_qty($item->received_qty) }}</td>
+                                    <td class="text-right">{{ inv_qty($item->rate) }}</td>
+                                    <td class="text-right">{{ inv_qty($item->amount) }}</td>
+                                    <td>{{ $item->lot_no ?? '—' }}</td>
+                                    <td>{{ $item->batch_no ?? '—' }}</td>
+                                    <td>{{ optional($item->expiry_date)->format('d M Y') ?? '—' }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                        <tfoot>
+                            <tr class="font-weight-bold"><td colspan="6" class="text-right">Total</td><td class="text-right">{{ inv_qty($grn->total_amount) }}</td><td colspan="3"></td></tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Remarks</label>
+                    <textarea name="approval_remarks" class="form-control form-control-sm" rows="2"></textarea>
+                </div>
+
+                @can('inv_grn.approve')
+                    <button type="submit" name="decision" value="approve" class="btn btn-sm ui-act ui-act-approve" title="Approve"><i class="fa-solid fa-check"></i> Approve</button>
+                @endcan
+                @can('inv_grn.reject')
+                    <button type="submit" name="decision" value="reject" class="btn btn-sm ui-act ui-act-reject" onclick="return confirm('Reject this GRN? The claimed quantity on its Purchase Order will be released.')" title="Reject"><i class="fa-solid fa-xmark"></i> Reject</button>
+                @endcan
+                <a href="{{ route('inventory.grns.index') }}" class="btn btn-sm ui-act ui-act-cancel" title="Cancel"><i class="fa-solid fa-ban"></i> Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+@endsection

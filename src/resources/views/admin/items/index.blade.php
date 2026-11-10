@@ -1,0 +1,268 @@
+@extends(adminTheme() . 'layouts.app')
+
+@section('title')
+    <title>{{ websiteTitle('Item Master') }}</title>
+@endsection
+
+@section('contents')
+<div class="flex-grow-1 inv-module">
+    @include('sfl-inventory::admin.partials.alerts')
+    @include('sfl-inventory::admin.partials.ui-kit')
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Item Master</h4>
+            <div>
+                @can('inv_item.delete')
+                    <button type="button" class="btn btn-sm ui-act ui-act-delete" data-toggle="modal" data-target="#itemTrashModal" title="Trash"><i class="fa-solid fa-trash"></i> Trash<span class="ui-btn-count">{{ $trashedItems->count() }}</span></button>
+                @endcan
+                @can('inv_item.export')
+                    <a href="{{ route('inventory.items.export', request()->query()) }}" class="btn btn-sm ui-act ui-act-excel" title="Excel"><i class="fa-solid fa-file-excel"></i> Excel</a>
+                    <a href="{{ route('inventory.items.print', request()->query()) }}" target="_blank" class="btn btn-sm ui-act ui-act-print" title="Print"><i class="fa-solid fa-print"></i> Print</a>
+                @endcan
+                @can('inv_item.merge')
+                    <a href="{{ route('inventory.items.merge-form') }}" class="btn btn-sm ui-act ui-act-merge" title="Merge Duplicates"><i class="fa-solid fa-code-merge"></i> Merge Duplicates</a>
+                @endcan
+                @can('inv_item.add')
+                    <a href="{{ route('inventory.items.create') }}" class="btn btn-sm ui-act ui-act-create" title="Add Item"><i class="fa-solid fa-plus"></i> Add Item</a>
+                @endcan
+            </div>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="row mb-3 align-items-end">
+                <div class="col-md-3 mb-2">
+                    <select name="item_id" class="form-control form-control-sm inv-select2">
+                        <option value="">All Items (search code or name)</option>
+                        @foreach($filterItems as $filterItem)
+                            <option value="{{ $filterItem->id }}" @selected(request('item_id') == $filterItem->id)>{{ $filterItem->item_code }} — {{ $filterItem->item_name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <select name="category_id" class="form-control form-control-sm inv-select2">
+                        <option value="">All Categories</option>
+                        @foreach($categories as $category)
+                            <option value="{{ $category->id }}" @selected(request('category_id') == $category->id)>{{ $category->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <select name="unit_id" class="form-control form-control-sm inv-select2">
+                        <option value="">All Units</option>
+                        @foreach($units as $unit)
+                            <option value="{{ $unit->id }}" @selected(request('unit_id') == $unit->id)>{{ $unit->name }} ({{ $unit->short_name }})</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <select name="item_type" class="form-control form-control-sm inv-select2">
+                        <option value="">All Types</option>
+                        <option value="raw_material" @selected(request('item_type') === 'raw_material')>Raw Material</option>
+                        <option value="wip" @selected(request('item_type') === 'wip')>WIP</option>
+                        <option value="finished_good" @selected(request('item_type') === 'finished_good')>Finished Good</option>
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <select name="department_id" class="form-control form-control-sm inv-select2">
+                        <option value="">All Departments</option>
+                        @foreach($departments as $department)
+                            <option value="{{ $department->id }}" @selected(request('department_id') == $department->id)>{{ $department->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <select name="supplier_id" class="form-control form-control-sm inv-select2">
+                        <option value="">All Suppliers</option>
+                        @foreach($suppliers as $supplier)
+                            <option value="{{ $supplier->id }}" @selected(request('supplier_id') == $supplier->id)>{{ $supplier->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <select name="store_id" class="form-control form-control-sm inv-select2">
+                        <option value="">All Stores</option>
+                        <option value="none" @selected(request('store_id') === 'none')>— No store assigned —</option>
+                        @foreach($stores as $store)
+                            <option value="{{ $store->id }}" @selected(request('store_id') == $store->id)>{{ $store->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <select name="buyer_id" class="form-control form-control-sm inv-select2">
+                        <option value="">All Buyers</option>
+                        @foreach($buyers as $buyer)
+                            <option value="{{ $buyer->id }}" @selected(request('buyer_id') == $buyer->id)>{{ $buyer->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <select name="status" class="form-control form-control-sm inv-select2">
+                        <option value="">All Status</option>
+                        <option value="active" @selected(request('status') === 'active')>Active</option>
+                        <option value="inactive" @selected(request('status') === 'inactive')>Inactive</option>
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2 d-flex align-items-end flex-wrap gap-1">
+                    <button type="submit" class="btn btn-sm ui-act ui-act-filter" title="Filter"><i class="fa-solid fa-filter"></i> Filter</button>
+                    <a href="{{ route('inventory.items.index') }}" class="btn btn-sm ui-act ui-act-reset" title="Reset"><i class="fa-solid fa-rotate-left"></i> Reset</a>
+                </div>
+            </form>
+
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>#</th><th>Code</th><th>Name</th><th>Category</th><th>Department</th><th>Supplier</th><th>Buyer</th><th>Unit</th><th>Type</th><th>Store</th><th>Status</th>
+                            @can('inv_barcode.use')
+                                <th>Barcode</th>
+                            @endcan
+                            <th class="text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($items as $item)
+                            <tr>
+                                <td>{{ $loop->iteration + $items->firstItem() - 1 }}</td>
+                                <td>{{ $item->item_code }}</td>
+                                <td>
+                                    {{ $item->item_name }}
+                                    {{-- Color/Size no longer live on the Item Master — picked per transaction line at Goods Receive instead. --}}
+                                    @if($item->brand)
+                                        <br><small class="text-muted">{{ $item->brand->name }}</small>
+                                    @endif
+                                </td>
+                                <td>{{ $item->category?->name }}</td>
+                                <td>{{ $item->department?->name ?? '—' }}</td>
+                                <td>{{ $item->supplier?->name ?? '—' }}</td>
+                                <td>{{ $item->buyerNames() ?: '—' }}</td>
+                                <td>{{ $item->unit?->short_name }}</td>
+                                <td>{{ ucwords(str_replace('_', ' ', $item->item_type)) }}</td>
+                                <td>{{ $item->openingStore?->name ?? '—' }}</td>
+                                <td>
+                                    <span class="badge badge-{{ $item->is_active ? 'success' : 'secondary' }}">
+                                        {{ $item->is_active ? 'Active' : 'Inactive' }}
+                                    </span>
+                                </td>
+                                @can('inv_barcode.use')
+                                    <td>
+                                        @if($item->barcode)
+                                            <code>{{ $item->barcode }}</code>
+                                        @elseif($item->barcode_enabled)
+                                            <form method="POST" action="{{ route('inventory.items.generate-barcode', $item) }}" class="d-inline">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-icon ui-act ui-act-auto" style="font-size:11px; padding:2px 6px;" title="Generate"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                                            </form>
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </td>
+                                @endcan
+                                <td class="text-right">
+                                    <button type="button" class="btn-custom ui-act ui-act-view" data-toggle="modal" data-target="#viewItemModal{{ $item->id }}" title="View"><i class="fa-solid fa-eye"></i></button>
+                                    @can('inv_item.edit')
+                                        <a href="{{ route('inventory.items.edit', $item) }}" class="btn-custom ui-act ui-act-edit" title="Edit"><i class="fa-solid fa-pen-to-square"></i></a>
+                                    @endcan
+                                    @can('inv_item.delete')
+                                        <button type="button" class="btn-custom ui-act ui-act-delete" data-toggle="modal" data-target="#deleteItemModal" data-action="{{ route('inventory.items.destroy', $item) }}" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                                    @endcan
+                                    @can('inv_item.force_delete')
+                                        {{-- Same permanent-delete confirm/modal the Trash list uses (itemTrashModalForceConfirm below) —
+                                             skips the normal Delete-then-Trash-then-Force two-step for an emergency one-click permanent
+                                             delete. Still runs through forceDestroy()'s referencing-table checks, so it's refused with a
+                                             clear error if the item is actually used on a real document; nothing here bypasses that. --}}
+                                        <button type="button" class="btn-custom ui-act ui-act-delete" title="Force Delete (skip Trash)" data-toggle="modal" data-target="#itemTrashModalForceConfirm" data-action="{{ route('inventory.items.force-destroy', $item) }}"><i class="fa-solid fa-trash"></i></button>
+                                    @endcan
+                                </td>
+                            </tr>
+
+                            <div class="modal fade" id="viewItemModal{{ $item->id }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog modal-lg">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Item Details — {{ $item->item_code }}</h5>
+                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <dl class="row mb-0">
+                                                <dt class="col-sm-3">Item Code</dt><dd class="col-sm-9">{{ $item->item_code }}</dd>
+                                                <dt class="col-sm-3">Item Name</dt><dd class="col-sm-9">{{ $item->item_name }}</dd>
+                                                <dt class="col-sm-3">Category</dt><dd class="col-sm-9">{{ $item->category?->name ?? '—' }}</dd>
+                                                <dt class="col-sm-3">Department</dt><dd class="col-sm-9">{{ $item->department?->name ?? '—' }}</dd>
+                                                <dt class="col-sm-3">Supplier</dt><dd class="col-sm-9">{{ $item->supplier?->name ?? '—' }}</dd>
+                                                <dt class="col-sm-3">Buyer</dt><dd class="col-sm-9">{{ $item->buyerNames() ?: '—' }}</dd>
+                                                <dt class="col-sm-3">Unit</dt><dd class="col-sm-9">{{ $item->unit?->name ?? '—' }} @if($item->unit?->short_name) ({{ $item->unit->short_name }}) @endif</dd>
+                                                <dt class="col-sm-3">Brand</dt><dd class="col-sm-9">{{ $item->brand?->name ?? '—' }}</dd>
+                                                {{-- Color/Size no longer live on the Item Master — picked per transaction line at Goods Receive instead.
+                                                <dt class="col-sm-3">Color</dt><dd class="col-sm-9">{{ $item->color?->name ?? '—' }}</dd>
+                                                <dt class="col-sm-3">Size</dt><dd class="col-sm-9">{{ $item->size?->name ?? '—' }}</dd>
+                                                --}}
+                                                <dt class="col-sm-3">Type</dt><dd class="col-sm-9">{{ $item->item_type ? ucwords(str_replace('_', ' ', $item->item_type)) : '—' }}</dd>
+                                                <dt class="col-sm-3">Store</dt><dd class="col-sm-9">{{ $item->openingStore?->name ?? '—' }}</dd>
+                                                <dt class="col-sm-3">Specification</dt><dd class="col-sm-9">{{ $item->specification ?: '—' }}</dd>
+                                                <dt class="col-sm-3">Low Stock Alert Qty</dt><dd class="col-sm-9">{{ $item->minimum_stock > 0 ? inv_qty($item->minimum_stock) : '—' }}</dd>
+                                                <dt class="col-sm-3">Status</dt>
+                                                <dd class="col-sm-9">
+                                                    <span class="badge badge-{{ $item->is_active ? 'success' : 'secondary' }}">
+                                                        {{ $item->is_active ? 'Active' : 'Inactive' }}
+                                                    </span>
+                                                </dd>
+                                            </dl>
+                                            @can('inv_barcode.use')
+                                                @if($item->barcode)
+                                                    <hr>
+                                                    <div class="text-center">
+                                                        <svg class="item-barcode-svg" data-barcode-value="{{ $item->barcode }}"></svg>
+                                                        <div class="text-muted" style="font-size:12px;">{{ $item->barcode }}</div>
+                                                    </div>
+                                                @endif
+                                            @endcan
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-sm ui-act ui-act-cancel" data-dismiss="modal" title="Close"><i class="fa-solid fa-ban"></i> Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @empty
+                            <tr><td colspan="13" class="text-center text-muted">No items found.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            {{ $items->links('pagination::bootstrap-5') }}
+        </div>
+    </div>
+</div>
+
+@include('sfl-inventory::admin.partials.delete-confirm-modal', ['modalId' => 'deleteItemModal', 'label' => 'item'])
+@include('sfl-inventory::admin.partials.trash-modal', [
+    'modalId' => 'itemTrashModal',
+    'label' => 'Item',
+    'rows' => $trashedItems,
+    'restoreRoute' => 'inventory.items.restore',
+    'forceRoute' => 'inventory.items.force-destroy',
+    'canRestore' => auth()->user()->can('inv_item.delete'),
+    'canForce' => auth()->user()->can('inv_item.force_delete'),
+    'forceWarning' => 'This wipes the item\'s entire stock ledger (all stock transactions) and removes the item itself — it cannot be undone.',
+])
+
+@can('inv_barcode.use')
+    @push('js')
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    <script>
+        // Rendered on-demand when a "View Item" modal opens (not for every
+        // row up front — with 600+ items that would be wasted work).
+        $(document).on('show.bs.modal', '.modal', function () {
+            document.querySelectorAll('.item-barcode-svg').forEach(function (svg) {
+                if (window.JsBarcode && svg.dataset.barcodeValue) {
+                    JsBarcode(svg, svg.dataset.barcodeValue, { format: 'CODE128', height: 50, displayValue: false });
+                }
+            });
+        });
+    </script>
+    @endpush
+@endcan
+
+@include('sfl-inventory::admin.partials.select2-init')
+@endsection

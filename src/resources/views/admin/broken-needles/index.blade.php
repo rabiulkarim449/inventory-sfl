@@ -1,0 +1,190 @@
+@extends(adminTheme() . 'layouts.app')
+
+@section('title')
+    <title>{{ websiteTitle('Broken Needle') }}</title>
+@endsection
+
+@section('contents')
+<div class="flex-grow-1 inv-module">
+    @include('sfl-inventory::admin.partials.alerts')
+    @include('sfl-inventory::admin.partials.ui-kit')
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Broken Needle Entries</h4>
+            <div class="d-flex align-items-center gap-2">
+                <a href="{{ route('inventory.broken-needles.daily-report') }}" class="btn btn-sm ui-act ui-act-report" title="Daily Needle Supply Report"><i class="fa-solid fa-chart-column"></i> Daily Needle Supply Report</a>
+                <a href="{{ route('inventory.broken-needles.report') }}" class="btn btn-sm ui-act ui-act-report" title="Monthly Report"><i class="fa-solid fa-chart-column"></i> Monthly Report</a>
+                <a href="{{ route('inventory.broken-needles.machine-report') }}" class="btn btn-sm ui-act ui-act-report" title="Machine Report"><i class="fa-solid fa-chart-column"></i> Machine Report</a>
+                @can('inv_broken_needle.delete')
+                    <button type="button" class="btn btn-sm ui-act ui-act-delete" data-toggle="modal" data-target="#brokenNeedleTrashModal" title="Trash"><i class="fa-solid fa-trash"></i> Trash<span class="ui-btn-count">{{ $trashedEntries->count() }}</span></button>
+                @endcan
+                @can('inv_broken_needle.add')
+                    <button type="button" class="btn btn-sm ui-act ui-act-create" data-toggle="modal" data-target="#createBrokenNeedleModal" title="Add Entry"><i class="fa-solid fa-plus"></i> Add Entry</button>
+                @endcan
+            </div>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="row mb-3 align-items-end">
+                <div class="col-md-3 mb-2">
+                    <select name="employee_id" class="form-control form-control-sm inv-select2">
+                        <option value="">All Employees</option>
+                        @foreach($employees as $employee)
+                            <option value="{{ $employee->id }}" @selected(request('employee_id') == $employee->id)>{{ $employee->name }} ({{ $employee->employee_id }})</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <select name="department_id" class="form-control form-control-sm inv-select2">
+                        <option value="">All Departments</option>
+                        @foreach($departments as $department)
+                            <option value="{{ $department->id }}" @selected(request('department_id') == $department->id)>{{ $department->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <select name="machine_id" class="form-control form-control-sm inv-select2">
+                        <option value="">All Machines</option>
+                        @foreach($machines as $machine)
+                            <option value="{{ $machine->id }}" @selected(request('machine_id') == $machine->id)>{{ $machine->name }} ({{ $machine->code }})</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <input type="text" name="line_no" class="form-control form-control-sm" placeholder="Line No" value="{{ request('line_no') }}">
+                </div>
+                <div class="col-md-3 mb-2">
+                    <select name="buyer_id" class="form-control form-control-sm inv-select2">
+                        <option value="">All Buyers</option>
+                        @foreach($buyers as $buyer)
+                            <option value="{{ $buyer->id }}" @selected(request('buyer_id') == $buyer->id)>{{ $buyer->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <input type="date" name="date_from" class="form-control form-control-sm" value="{{ request('date_from') }}" placeholder="From">
+                </div>
+                <div class="col-md-3 mb-2">
+                    <input type="date" name="date_to" class="form-control form-control-sm" value="{{ request('date_to') }}" placeholder="To">
+                </div>
+                <div class="col-md-3 mb-2 d-flex align-items-end flex-wrap gap-1">
+                    <button type="submit" class="btn btn-sm ui-act ui-act-filter" title="Filter"><i class="fa-solid fa-filter"></i> Filter</button>
+                    <a href="{{ route('inventory.broken-needles.index') }}" class="btn btn-sm ui-act ui-act-reset" title="Reset"><i class="fa-solid fa-rotate-left"></i> Reset</a>
+                </div>
+            </form>
+
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm align-middle">
+                    <thead>
+                        <tr>
+                            <th>#</th><th>Date</th><th>Line</th><th>Employee</th><th>Department</th><th>Machine</th>
+                            <th>Needle Type</th><th>Needle Size</th><th class="text-right">Qty</th><th>Buyer / Style</th><th>Remarks</th><th class="text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($entries as $entry)
+                            <tr>
+                                <td>{{ $loop->iteration + $entries->firstItem() - 1 }}</td>
+                                <td>{{ $entry->broken_date?->format('d M Y') }}</td>
+                                <td>{{ $entry->line_no }}</td>
+                                <td>{{ $entry->employee?->name ?? '—' }}</td>
+                                <td>{{ $entry->department?->name ?? '—' }}</td>
+                                <td>{{ $entry->machine?->name ?? '—' }}</td>
+                                <td>{{ $entry->needle_type }}</td>
+                                <td>{{ $entry->needle_size }}</td>
+                                <td class="text-right">{{ $entry->quantity }}</td>
+                                <td>{{ trim(($entry->buyer?->name ?? '') . ($entry->style ? ' / ' . $entry->style : '')) ?: '—' }}</td>
+                                <td>{{ $entry->remarks }}</td>
+                                <td class="text-right">
+                                    @can('inv_broken_needle.edit')
+                                        <button type="button" class="btn-custom ui-act ui-act-edit" data-toggle="modal" data-target="#editBrokenNeedleModal{{ $entry->id }}" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+                                    @endcan
+                                    @can('inv_broken_needle.delete')
+                                        <button type="button" class="btn-custom ui-act ui-act-delete" data-toggle="modal" data-target="#deleteBrokenNeedleModal" data-action="{{ route('inventory.broken-needles.destroy', $entry) }}" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                                    @endcan
+                                </td>
+                            </tr>
+
+                            @can('inv_broken_needle.edit')
+                                <div class="modal fade" id="editBrokenNeedleModal{{ $entry->id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-lg">
+                                        <div class="modal-content">
+                                            <form method="POST" action="{{ route('inventory.broken-needles.update', $entry) }}">
+                                                @csrf @method('PUT')
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Edit Entry</h5>
+                                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    @include('sfl-inventory::admin.broken-needles.partials.fields', ['entry' => $entry])
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-sm ui-act ui-act-cancel" data-dismiss="modal" title="Cancel"><i class="fa-solid fa-ban"></i> Cancel</button>
+                                                    <button type="submit" class="btn btn-sm ui-act ui-act-save" title="Update"><i class="fa-solid fa-floppy-disk"></i> Update</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endcan
+                        @empty
+                            <tr><td colspan="12" class="text-center text-muted">No broken needle entries found.</td></tr>
+                        @endforelse
+                    </tbody>
+                    @if($entries->total())
+                        <tfoot>
+                            <tr class="font-weight-bold">
+                                <td colspan="8" class="text-right">Total: {{ $entries->total() }} entr{{ $entries->total() === 1 ? 'y' : 'ies' }}{{ $entries->hasPages() ? ' (all pages)' : '' }}</td>
+                                <td class="text-right">{{ inv_qty($grandTotal) }}</td>
+                                <td colspan="3"></td>
+                            </tr>
+                        </tfoot>
+                    @endif
+                </table>
+            </div>
+
+            {{ $entries->links('pagination::bootstrap-5') }}
+        </div>
+    </div>
+</div>
+
+@can('inv_broken_needle.add')
+    <div class="modal fade" id="createBrokenNeedleModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form method="POST" action="{{ route('inventory.broken-needles.store') }}">
+                    @csrf
+                    <div class="modal-header">
+                        <h5 class="modal-title">Add Broken Needle Entry</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    </div>
+                    <div class="modal-body">
+                        @include('sfl-inventory::admin.broken-needles.partials.fields', ['entry' => null])
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-sm ui-act ui-act-cancel" data-dismiss="modal" title="Cancel"><i class="fa-solid fa-ban"></i> Cancel</button>
+                        <button type="submit" class="btn btn-sm ui-act ui-act-save" title="Save"><i class="fa-solid fa-floppy-disk"></i> Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+@endcan
+
+@include('sfl-inventory::admin.partials.delete-confirm-modal', ['modalId' => 'deleteBrokenNeedleModal', 'label' => 'entry'])
+@include('sfl-inventory::admin.partials.trash-modal', [
+    'modalId' => 'brokenNeedleTrashModal',
+    'label' => 'Broken Needle Entry',
+    'rows' => $trashedEntries,
+    'restoreRoute' => 'inventory.broken-needles.restore',
+    'forceRoute' => 'inventory.broken-needles.force-destroy',
+    'canRestore' => auth()->user()->can('inv_broken_needle.delete'),
+    'canForce' => auth()->user()->can('inv_broken_needle.force_delete'),
+])
+@include('sfl-inventory::admin.partials.select2-init')
+@endsection
+
+
+
+
+

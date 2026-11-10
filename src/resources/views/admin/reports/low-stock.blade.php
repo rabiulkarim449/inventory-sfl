@@ -1,0 +1,83 @@
+@php $printMode = $printMode ?? request()->boolean('print'); @endphp
+@extends(request()->boolean('excel_export') ? 'sfl-inventory::export-minimal' : ($printMode ? 'printMaster2' : adminTheme() . 'layouts.app'))
+
+@section('title')
+    @if($printMode)
+        {{ websiteTitle('Low Stock Report') }}
+    @else
+        <title>{{ websiteTitle('Low Stock Report') }}</title>
+    @endif
+@endsection
+
+@section('contents')
+<div class="flex-grow-1 inv-module">
+    @if($printMode)
+        @include('sfl-inventory::admin.reports.partials.print-header', ['title' => 'Low Stock Report'])
+    @else
+        @include('sfl-inventory::admin.partials.alerts')
+        @include('sfl-inventory::admin.partials.ui-kit')
+    @endif
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Low Stock Report</h4>
+            @unless($printMode)
+                @include('sfl-inventory::admin.reports.partials.export-print-buttons', ['report' => 'low-stock'])
+            @endunless
+        </div>
+        <div class="card-body">
+            @unless($printMode)
+                <form method="GET" class="row mb-3 align-items-end">
+                    <div class="col-md-3 mb-2">
+                        <select name="item_id" class="form-control form-control-sm inv-select2">
+                            <option value="">All Items</option>
+                            @foreach($filterItems as $filterItem)
+                                <option value="{{ $filterItem->id }}" @selected(request('item_id') == $filterItem->id)>{{ $filterItem->item_code }} — {{ $filterItem->item_name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <select name="category_id" class="form-control form-control-sm inv-select2">
+                            <option value="">All Categories</option>
+                            @foreach($categories as $category)
+                                <option value="{{ $category->id }}" @selected(request('category_id') == $category->id)>{{ $category->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-2 d-flex align-items-end flex-wrap gap-1">
+                        <button type="submit" class="btn btn-sm ui-act ui-act-filter" title="Filter"><i class="fa-solid fa-filter"></i> Filter</button>
+                        <a href="{{ url()->current() }}" class="btn btn-sm ui-act ui-act-reset" title="Reset"><i class="fa-solid fa-rotate-left"></i> Reset</a>
+                    </div>
+                </form>
+            @endunless
+
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm align-middle">
+                    <thead><tr><th>Item Code</th><th>Item Name</th><th>Category</th><th class="text-right">Current Stock</th><th class="text-right">Minimum Stock</th></tr></thead>
+                    <tbody>
+                        @forelse($items as $item)
+                            <tr class="table-warning">
+                                <td>{{ $item->item_code }}</td>
+                                <td>{{ $item->item_name }}</td>
+                                <td>{{ $item->category?->name }}</td>
+                                <td class="text-right">{{ inv_qty($item->current_stock) }} {{ $item->unit?->short_name }}</td>
+                                <td class="text-right">{{ inv_qty($item->minimum_stock) }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="5" class="text-center text-muted">No items are below minimum stock.</td></tr>
+                        @endforelse
+                    </tbody>
+                    @if($items->isNotEmpty())
+                        <tfoot>
+                            <tr class="font-weight-bold"><td colspan="5">Total: {{ $items->count() }} item(s) at or below minimum stock</td></tr>
+                        </tfoot>
+                    @endif
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+@unless($printMode)
+    @include('sfl-inventory::admin.partials.select2-init')
+@endunless
+@endsection
