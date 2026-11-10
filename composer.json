@@ -1,18 +1,18 @@
 {
     "name": "mestiaque/sfl-inventory",
-    "description": "Garments Inventory Management module for Laravel (Suhana Fashions Limited) by M. Estiaque Ahmed Khan",
+    "description": "Garments Inventory Management module for Laravel (Suhana Fashions Limited) by Natore-IT",
     "type": "library",
     "keywords": [
         "Laravel",
         "SflInventory",
         "Inventory",
-        "Estiaque"
+        "Natore-IT"
     ],
     "authors": [
         {
-            "name": "M. Estiaque Ahmed Khan",
-            "email": "mrm.khan.1298@gmail.com",
-            "homepage": "https://mestiaque.com"
+            "name": "Natore-IT",
+            "email": "info@natoreit.com",
+            "homepage": "https://natoreit.com"
         }
     ],
     "require": {
