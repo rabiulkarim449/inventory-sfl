@@ -23,6 +23,7 @@ use ME\SflInventory\Models\InvStore;
 use ME\SflInventory\Models\InvSupplier;
 use ME\SflInventory\Models\InvUnit;
 use ME\SflInventory\Services\StockService;
+use ME\SflInventory\Support\BuyerHide; // reports obey the role's "Hide Export / Local Buyer" ticks
 
 /**
  * One controller for all 13 report types (module 20). Every action is gated
@@ -377,7 +378,7 @@ class InvReportController extends Controller
         $lines = InvGrnItem::query()
             ->select('inv_grn_items.*')
             ->join('inv_grns', 'inv_grns.id', '=', 'inv_grn_items.grn_id')
-            ->whereNull('inv_grns.deleted_at')
+            ->whereNull('inv_grns.deleted_at')->tap(fn ($q) => BuyerHide::apply($q, 'inv_grns'))
             ->where('inv_grns.status', 'posted')
             ->where($this->buyerStyleContextClause('inv_grns'))
             ->with(['item.unit', 'color', 'size', 'grn.buyer'])
@@ -397,7 +398,7 @@ class InvReportController extends Controller
             ->join('inv_grns as g', 'g.id', '=', 'gi.grn_id')
             ->whereNull('g.deleted_at')
             ->where('g.status', 'posted')
-            ->where($this->buyerStyleContextClause('g'))
+            ->where($this->buyerStyleContextClause('g'))->tap(fn ($q) => BuyerHide::apply($q, 'g'))
             ->when($request->filled('buyer_id'), fn ($q) => $q->where('g.buyer_id', $request->buyer_id))
             ->when($request->filled('style'), fn ($q) => $q->where('g.style', $request->style))
             ->when($request->filled('item_id'), fn ($q) => $q->where('gi.item_id', $request->item_id))
@@ -416,7 +417,7 @@ class InvReportController extends Controller
             ->leftJoinSub(\ME\SflInventory\Models\InvIssueReturnItem::totalsByIssueItem(), 'rtn', 'rtn.issue_item_id', '=', 'ii.id')
             ->whereNull('i.deleted_at')
             ->where('i.status', 'approved')
-            ->where($this->buyerStyleContextClause('i'))
+            ->where($this->buyerStyleContextClause('i'))->tap(fn ($q) => BuyerHide::apply($q, 'i'))
             ->when($request->filled('buyer_id'), fn ($q) => $q->where('i.buyer_id', $request->buyer_id))
             ->when($request->filled('style'), fn ($q) => $q->where('i.style', $request->style))
             ->when($request->filled('item_id'), fn ($q) => $q->where('ii.item_id', $request->item_id))
@@ -445,7 +446,7 @@ class InvReportController extends Controller
         $styleSpans = $this->rowSpans($rows, fn ($line) => $line->grn->style ?? '');
         $buyerSpans = $this->rowSpans($rows, fn ($line) => $line->grn->buyer_id ?? 0);
 
-        $buyers = InvBuyer::active()->orderBy('name')->get();
+        $buyers = BuyerHide::buyers(InvBuyer::active())->orderBy('name')->get();
         $items = InvItem::active()->orderBy('item_name')->get();
         $styles = $this->styleOptions();
 
@@ -455,8 +456,8 @@ class InvReportController extends Controller
     /** Every style ever received or issued — for the Style dropdown filters. */
     private function styleOptions(): \Illuminate\Support\Collection
     {
-        return DB::table('inv_grns')->whereNull('deleted_at')->whereNotNull('style')->where('style', '!=', '')->distinct()->pluck('style')
-            ->merge(DB::table('inv_issues')->whereNull('deleted_at')->whereNotNull('style')->where('style', '!=', '')->distinct()->pluck('style'))
+        return BuyerHide::apply(DB::table('inv_grns'), 'inv_grns')->whereNull('deleted_at')->whereNotNull('style')->where('style', '!=', '')->distinct()->pluck('style')
+            ->merge(BuyerHide::apply(DB::table('inv_issues'), 'inv_issues')->whereNull('deleted_at')->whereNotNull('style')->where('style', '!=', '')->distinct()->pluck('style'))
             ->map(fn ($s) => trim($s))->unique()->sort(SORT_NATURAL)->values();
     }
 
@@ -509,7 +510,7 @@ class InvReportController extends Controller
         $this->authorize('inv_report.view');
 
         $query = InvGrn::query()
-            ->with(['store', 'supplier', 'purchaseOrder'])
+            ->with(['store', 'supplier', 'purchaseOrder'])->tap(fn ($q) => BuyerHide::apply($q, 'inv_grns'))
             ->when($request->filled('store_id'), fn ($q) => $q->where('store_id', $request->store_id))
             ->when($request->filled('supplier_id'), fn ($q) => $q->where('supplier_id', $request->supplier_id))
             ->when($request->filled('item_id'), fn ($q) => $q->whereHas('items', fn ($iq) => $iq->where('item_id', $request->item_id)))
@@ -541,7 +542,7 @@ class InvReportController extends Controller
         $lines = InvGrnItem::query()
             ->select('inv_grn_items.*')
             ->join('inv_grns', 'inv_grns.id', '=', 'inv_grn_items.grn_id')
-            ->whereNull('inv_grns.deleted_at')
+            ->whereNull('inv_grns.deleted_at')->tap(fn ($q) => BuyerHide::apply($q, 'inv_grns'))
             ->with(['item.unit', 'color', 'size', 'grn.store', 'grn.supplier', 'grn.buyer', 'grn.purchaseOrder', 'grn.creator'])
             ->when($request->filled('item_id'), fn ($q) => $q->where('inv_grn_items.item_id', $request->item_id))
             ->when($request->filled('color_id'), fn ($q) => $q->where('inv_grn_items.color_id', $request->color_id))
@@ -580,7 +581,7 @@ class InvReportController extends Controller
         $linesQuery = InvGrnItem::query()
             ->select('inv_grn_items.*')
             ->join('inv_grns', 'inv_grns.id', '=', 'inv_grn_items.grn_id')
-            ->whereNull('inv_grns.deleted_at')
+            ->whereNull('inv_grns.deleted_at')->tap(fn ($q) => BuyerHide::apply($q, 'inv_grns'))
             ->whereNotNull('inv_grn_items.expiry_date')
             ->with(['item.unit', 'grn.store'])
             ->when($request->filled('item_id'), fn ($q) => $q->where('inv_grn_items.item_id', $request->item_id))
@@ -616,7 +617,7 @@ class InvReportController extends Controller
         $this->authorize('inv_report.view');
 
         $issues = InvIssue::query()
-            ->with(['store', 'department', 'buyer'])
+            ->with(['store', 'department', 'buyer'])->tap(fn ($q) => BuyerHide::apply($q, 'inv_issues'))
             // Issue Qty = what actually left the store (issued_qty); Delivery
             // Qty = what the receiving department has confirmed getting
             // (department_received_qty) — these can differ until the
@@ -635,7 +636,7 @@ class InvReportController extends Controller
             ->withQueryString();
 
         $departments = InvDepartment::active()->orderBy('name')->get();
-        $buyers = InvBuyer::active()->orderBy('name')->get();
+        $buyers = BuyerHide::buyers(InvBuyer::active())->orderBy('name')->get();
         $items = InvItem::active()->orderBy('item_name')->get();
         $stores = InvStore::active()->orderBy('name')->get();
         $styles = $this->styleOptions();
@@ -648,7 +649,7 @@ class InvReportController extends Controller
         $this->authorize('inv_report.view');
 
         $gatePassesQuery = InvGatePass::query()
-            ->with(['buyer', 'store'])
+            ->with(['buyer', 'store'])->tap(fn ($q) => BuyerHide::apply($q, 'inv_gate_passes', false))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
             ->when($request->filled('date_from'), fn ($q) => $q->whereDate('gate_pass_date', '>=', $request->date_from))
             ->when($request->filled('date_to'), fn ($q) => $q->whereDate('gate_pass_date', '<=', $request->date_to))
@@ -674,7 +675,7 @@ class InvReportController extends Controller
         $this->authorize('inv_report.view');
 
         $shipmentsQuery = InvShipment::query()
-            ->with(['buyer', 'gatePass', 'gatePasses'])
+            ->with(['buyer', 'gatePass', 'gatePasses'])->tap(fn ($q) => BuyerHide::apply($q, 'inv_shipments', false))
             ->when($request->filled('buyer_id'), fn ($q) => $q->where('buyer_id', $request->buyer_id))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
             ->when($request->filled('date_from'), fn ($q) => $q->whereDate('shipment_date', '>=', $request->date_from))
@@ -691,7 +692,7 @@ class InvReportController extends Controller
             ->paginate($request->boolean('print') ? 100000 : 30)
             ->withQueryString();
 
-        $buyers = InvBuyer::active()->orderBy('name')->get();
+        $buyers = BuyerHide::buyers(InvBuyer::active())->orderBy('name')->get();
 
         $filterItems = InvItem::active()->orderBy('item_name')->get(['id', 'item_code', 'item_name']);
 
