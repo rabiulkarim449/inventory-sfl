@@ -122,6 +122,7 @@ Route::middleware($route['middleware'] ?? ['web', 'auth'])
         Route::get('grns/create/buyer', [InvGrnController::class, 'createBuyer'])->name('grns.create-buyer');
         Route::get('grns/{grn}/approval', [InvGrnController::class, 'approvalForm'])->name('grns.approval-form');
         Route::post('grns/{grn}/approval', [InvGrnController::class, 'approval'])->name('grns.approval');
+        Route::post('grns/{grn}/inspection', [InvGrnController::class, 'inspection'])->name('grns.inspection');
         Route::post('grns/{grn}/restore', [InvGrnController::class, 'restore'])->name('grns.restore')->withTrashed();
         Route::delete('grns/{grn}/force', [InvGrnController::class, 'forceDestroy'])->name('grns.force-destroy')->withTrashed();
 

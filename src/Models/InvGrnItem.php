@@ -14,12 +14,21 @@ class InvGrnItem extends Model
 
     protected $table = 'inv_grn_items';
 
+    /** Inspection result of a received line => [label, badge colour]; null = not inspected yet. */
+    public const INSPECTION = [
+        'passed'  => ['Passed', 'success'],
+        'partial' => ['Partly Passed', 'warning'],
+        'failed'  => ['Failed', 'danger'],
+    ];
+
     protected $fillable = [
         'grn_id', 'purchase_order_item_id', 'item_id', 'color_id', 'size_id', 'ordered_qty', 'received_qty', 'rejected_qty',
         'rate', 'amount', 'lot_no', 'batch_no', 'expiry_date', 'remarks',
+        'inspection_status', 'inspection_remarks', 'inspected_by', 'inspected_at',
     ];
 
     protected $casts = [
+        'inspected_at' => 'datetime',
         'ordered_qty'  => 'decimal:4',
         'received_qty' => 'decimal:4',
         'rejected_qty' => 'decimal:4',

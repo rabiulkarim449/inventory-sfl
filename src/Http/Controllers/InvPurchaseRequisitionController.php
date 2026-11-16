@@ -17,6 +17,7 @@ use ME\SflInventory\Models\InvPurchaseOrder;
 use ME\SflInventory\Models\InvPurchaseRequisition;
 use ME\SflInventory\Models\InvPurchaseRequisitionItem;
 use ME\SflInventory\Models\InvSize;
+use ME\SflInventory\Services\MerchandisingLink;
 
 class InvPurchaseRequisitionController extends Controller
 {
@@ -63,6 +64,7 @@ class InvPurchaseRequisitionController extends Controller
             $purchaseRequisition = InvPurchaseRequisition::create([
                 'requisition_date' => $data['requisition_date'],
                 'department_id'    => $data['department_id'] ?? null,
+                ...$this->merchandisingFields($data),
                 'requested_by'     => auth()->id(),
                 'status'           => $autoApprove ? 'approved' : 'pending',
                 'remarks'          => $data['remarks'] ?? null,
@@ -129,6 +131,7 @@ class InvPurchaseRequisitionController extends Controller
             $purchase_requisition->update([
                 'requisition_date' => $data['requisition_date'],
                 'department_id'    => $data['department_id'] ?? null,
+                ...$this->merchandisingFields($data),
                 'remarks'          => $data['remarks'] ?? null,
             ]);
 
@@ -376,6 +379,26 @@ class InvPurchaseRequisitionController extends Controller
             ]);
     }
 
+    /**
+     * The optional Merchandising Buyer → Style → PO the purchase is for. Without Merchandising the
+     * columns are left untouched; with it, an empty pick clears them (a general purchase).
+     */
+    private function merchandisingFields(array $data): array
+    {
+        $link = app(MerchandisingLink::class);
+        if (! $link->available() || ! array_key_exists('msfl_buyer_id', $data)) {
+            return [];
+        }
+        $styleId = ! empty($data['msfl_style_id']) ? (int) $data['msfl_style_id'] : null;
+
+        return [
+            'msfl_buyer_id'    => ! empty($data['msfl_buyer_id']) ? (int) $data['msfl_buyer_id'] : null,
+            'msfl_style_id'    => $styleId,
+            'msfl_order_po_id' => $styleId && ! empty($data['msfl_order_po_id']) ? (int) $data['msfl_order_po_id'] : null,
+            'style'            => $styleId ? $link->styleNo($styleId) : (trim((string) ($data['style'] ?? '')) ?: null),
+        ];
+    }
+
     private function formOptions(iterable $keepItemIds = []): array
     {
         return [
@@ -383,6 +406,6 @@ class InvPurchaseRequisitionController extends Controller
             'items'       => InvItem::selectable($keepItemIds)->with('unit')->orderBy('item_name')->get(),
             'colors'      => InvColor::active()->orderBy('name')->get(),
             'sizes'       => InvSize::active()->ordered()->get(),
-        ];
+        ] + app(MerchandisingLink::class)->formOptions();
     }
 }

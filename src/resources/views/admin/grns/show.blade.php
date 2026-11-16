@@ -88,13 +88,20 @@
                 @endif
             </dl>
 
+            @php
+                // Inspection (QC after receive): editable here with permission; a record only, stock is not touched.
+                $canInspect = auth()->user()?->can('inv_grn.inspect') && ! in_array($grn->status, ['rejected', 'cancelled'], true);
+                $inspection = \ME\SflInventory\Models\InvGrnItem::INSPECTION;
+            @endphp
             <h6>Items</h6>
+            @if($canInspect)<form method="POST" action="{{ route('inventory.grns.inspection', $grn) }}">@csrf @endif
             <div class="table-responsive">
                 <table class="table table-bordered table-sm align-middle">
                     <thead>
                         <tr>
                             <th>Item</th><th>Unit</th><th>Color</th><th>Size</th><th class="text-right">Received Qty</th><th class="text-right">Rejected Qty</th>
                             <th class="text-right">Rate</th><th class="text-right">Amount</th><th>Lot No</th><th>Batch No</th><th>Expiry Date</th>
+                            <th style="min-width:150px">Inspection</th><th style="min-width:160px">Inspection Remarks</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -111,14 +118,32 @@
                                 <td>{{ $item->lot_no ?? '—' }}</td>
                                 <td>{{ $item->batch_no ?? '—' }}</td>
                                 <td>{{ optional($item->expiry_date)->format('d M Y') ?? '—' }}</td>
+                                @if($canInspect)
+                                    <td>
+                                        <select name="items[{{ $item->id }}][inspection_status]" class="form-control form-control-sm">
+                                            <option value="">— Not inspected —</option>
+                                            @foreach($inspection as $value => [$label])
+                                                <option value="{{ $value }}" @selected($item->inspection_status === $value)>{{ $label }}</option>
+                                            @endforeach
+                                        </select>
+                                    </td>
+                                    <td><input type="text" name="items[{{ $item->id }}][inspection_remarks]" class="form-control form-control-sm" maxlength="255" value="{{ $item->inspection_remarks }}"></td>
+                                @else
+                                    <td>@if($item->inspection_status)<span class="badge badge-{{ $inspection[$item->inspection_status][1] ?? 'secondary' }}">{{ $inspection[$item->inspection_status][0] ?? $item->inspection_status }}</span>@else<span class="text-muted">Not inspected</span>@endif</td>
+                                    <td>{{ $item->inspection_remarks ?? '—' }}</td>
+                                @endif
                             </tr>
                         @endforeach
                     </tbody>
                     <tfoot>
-                        <tr class="font-weight-bold"><td colspan="7" class="text-right">Total</td><td class="text-right">{{ inv_qty($grn->total_amount) }}</td><td colspan="3"></td></tr>
+                        <tr class="font-weight-bold"><td colspan="7" class="text-right">Total</td><td class="text-right">{{ inv_qty($grn->total_amount) }}</td><td colspan="5"></td></tr>
                     </tfoot>
                 </table>
             </div>
+            @if($canInspect)
+                <button type="submit" class="btn btn-sm ui-act ui-act-save" title="Save Inspection"><i class="fa-solid fa-floppy-disk"></i> Save Inspection</button>
+                </form>
+            @endif
         </div>
     </div>
 </div>

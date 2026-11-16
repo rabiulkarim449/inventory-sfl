@@ -1,4 +1,4 @@
-{{-- props: purchaseRequisition (optional, for edit), departments, items, colors, sizes --}}
+{{-- props: purchaseRequisition (optional, for edit), departments, items, colors, sizes (+ MerchandisingLink::formOptions()) --}}
 <div class="row">
     <div class="col-md-3 mb-3">
         <label class="form-label">Department / Section</label>
@@ -13,6 +13,16 @@
         <label class="form-label">Requisition Date <span class="text-danger">*</span></label>
         <input type="date" name="requisition_date" class="form-control form-control-sm" value="{{ old('requisition_date', optional($purchaseRequisition->requisition_date ?? null)->format('Y-m-d') ?? now()->toDateString()) }}" required>
     </div>
+    @if($merLinked ?? false)
+        {{-- Optional: the order this purchase is for (Merchandising) — its Store Order and GRNs follow it; empty for general purchases. --}}
+        @include('sfl-inventory::admin.partials.mer-buyer-style', ['pick' => [
+            'id' => 'preqMer',
+            'buyer' => $purchaseRequisition->msfl_buyer_id ?? null,
+            'style' => isset($purchaseRequisition) ? app(\ME\SflInventory\Services\MerchandisingLink::class)->pickedStyleValue($purchaseRequisition->msfl_style_id, $purchaseRequisition->style) : null,
+            'po' => $purchaseRequisition->msfl_order_po_id ?? null,
+        ]])
+        <div class="col-12 mb-2"><small class="text-muted">Buyer / Style / PO: শুধু কোনো order-এর জন্য কেনা হলে দিন (MRP-তে On Order দেখায়) — সাধারণ কেনাকাটায় খালি রাখুন।</small></div>
+    @endif
     <div class="col-12 mb-3">
         <label class="form-label">Remarks</label>
         <textarea name="remarks" class="form-control form-control-sm" rows="2">{{ old('remarks', $purchaseRequisition->remarks ?? '') }}</textarea>

@@ -71,7 +71,7 @@
                         @forelse($purchaseRequisitions as $purchaseRequisition)
                             <tr>
                                 <td>{{ $loop->iteration + $purchaseRequisitions->firstItem() - 1 }}</td>
-                                <td>{{ $purchaseRequisition->requisition_no }}</td>
+                                <td>{{ $purchaseRequisition->requisition_no }}@if($purchaseRequisition->style)<div class="small text-muted">Style: {{ $purchaseRequisition->style }}</div>@endif</td>
                                 <td>{{ $purchaseRequisition->department?->name ?? '—' }}</td>
                                 <td>{{ $purchaseRequisition->requisition_date?->format('d M Y') }}</td>
                                 <td>{{ $purchaseRequisition->requester?->name ?? '—' }}</td>
@@ -142,6 +142,7 @@
                 <div class="modal-body">
                     <dl class="row mb-3">
                         <dt class="col-sm-3">Department</dt><dd class="col-sm-9">{{ $purchaseRequisition->department?->name ?? '—' }}</dd>
+                        @if($purchaseRequisition->style)<dt class="col-sm-3">Style</dt><dd class="col-sm-9">{{ $purchaseRequisition->style }}</dd>@endif
                         <dt class="col-sm-3">Requisition Date</dt><dd class="col-sm-9">{{ $purchaseRequisition->requisition_date?->format('d M Y') }}</dd>
                         <dt class="col-sm-3">Requested By</dt><dd class="col-sm-9">{{ $purchaseRequisition->requester?->name ?? '—' }}</dd>
                         <dt class="col-sm-3">Status</dt>

@@ -21,6 +21,8 @@ class InvPurchaseRequisition extends Model
     protected $fillable = [
         'requisition_no', 'requisition_date', 'department_id', 'requested_by',
         'status', 'approved_by', 'approved_at', 'approval_remarks', 'remarks', 'created_by',
+        // Optional Merchandising Buyer → Style → PO the purchase is for (+ style text).
+        'msfl_buyer_id', 'msfl_style_id', 'msfl_order_po_id', 'style',
     ];
 
     protected $casts = [

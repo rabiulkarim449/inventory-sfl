@@ -119,6 +119,40 @@ class InvGrnController extends Controller
     }
 
     /**
+     * Inspection result per received line (QC after the goods are in): passed / partly passed / failed
+     * + remark. A record only — the stock this GRN posted is not changed.
+     */
+    public function inspection(Request $request, InvGrn $grn): RedirectResponse
+    {
+        $this->authorize('inv_grn.inspect');
+        abort_if(in_array($grn->status, ['rejected', 'cancelled'], true), 403, 'A rejected / cancelled GRN cannot be inspected.');
+
+        $rows = $request->validate([
+            'items'                      => ['required', 'array'],
+            'items.*.inspection_status'  => ['nullable', \Illuminate\Validation\Rule::in(array_keys(\ME\SflInventory\Models\InvGrnItem::INSPECTION))],
+            'items.*.inspection_remarks' => ['nullable', 'string', 'max:255'],
+        ])['items'];
+
+        DB::transaction(function () use ($grn, $rows) {
+            foreach ($grn->items()->whereIn('id', array_keys($rows))->get() as $item) {
+                $status = ($rows[$item->id]['inspection_status'] ?? null) ?: null;
+                $remarks = $rows[$item->id]['inspection_remarks'] ?? null;
+                if ($status === $item->inspection_status && $remarks === $item->inspection_remarks) {
+                    continue;
+                }
+                $item->update([
+                    'inspection_status'  => $status,
+                    'inspection_remarks' => $remarks,
+                    'inspected_by'       => $status ? auth()->id() : null,
+                    'inspected_at'       => $status ? now() : null,
+                ]);
+            }
+        });
+
+        return back()->with('success', 'Inspection saved.');
+    }
+
+    /**
      * Store/source/supplier/buyer/PO link are fixed on edit — changing which
      * store or which order a GRN belongs to is a bigger operation than a
      * quantity/rate correction, so that stays a delete + re-create. Only the

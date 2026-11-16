@@ -83,7 +83,7 @@ return [
         ],
         'inv_grn' => [
             'label' => 'Goods Receive Note (GRN)',
-            'permissions' => $crud + ['approve' => 'Approve', 'reject' => 'Reject', 'print' => 'Print', 'export' => 'Export', 'force_delete' => 'Force Delete'],
+            'permissions' => $crud + ['approve' => 'Approve', 'reject' => 'Reject', 'inspect' => 'Inspection (QC result)', 'print' => 'Print', 'export' => 'Export', 'force_delete' => 'Force Delete'],
         ],
         'inv_stock_overview' => [
             'label' => 'Main Store Inventory',
