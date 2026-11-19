@@ -244,7 +244,7 @@ class ManualChallanController extends Controller
 
     private function formData(string $type, ManualChallan $challan): array
     {
-        return ['type' => $type, 'info' => ManualChallanTypes::get($type), 'challan' => $challan, 'sizes' => ManualChallanTypes::SIZES];
+        return ['type' => $type, 'info' => ManualChallanTypes::get($type), 'challan' => $challan, 'sizes' => ManualChallanTypes::get($type)['sizes'] ?? []];
     }
 
     /** Validated header + lines; blank lines are dropped, at least one must remain. */
