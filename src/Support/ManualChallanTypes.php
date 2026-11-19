@@ -30,6 +30,12 @@ class ManualChallanTypes
             'title' => 'Delivery Challan for Marketing & Development Sample',
             'menu' => 'Marketing & Development Sample',
         ],
+        'pp_sample' => [
+            'title' => 'Delivery Challan for PP Sample',
+            'menu' => 'PP Sample',
+            // Total Qty = Sample of Buyer + PP Sample from SFL.
+            'total_of' => ['buyer_sample_qty', 'sfl_sample_qty'],
+        ],
     ];
 
     /** Green columns a type allows (empty for a type without any). */

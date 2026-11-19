@@ -278,12 +278,16 @@ class ManualChallanController extends Controller
         // Ticked green columns, kept in the type's own order; anything typed in an unticked one is dropped.
         $on = array_values(array_intersect($allowed, $data['optional_columns'] ?? []));
         $data['optional_columns'] = $on;
-        $data['items'] = collect($data['items'])->map(function ($line) use ($on) {
+        $data['items'] = collect($data['items'])->map(function ($line) use ($on, $type) {
             $sizes = collect($line['sizes'] ?? [])->only(array_intersect(ManualChallanTypes::SIZES, $on))
                 ->map(fn ($v) => (float) $v)->filter(fn ($v) => $v > 0)->all();
             $line['sizes'] = $sizes ?: null;
             // Size-wise qty given: the total is their sum.
             $line['qty'] = $sizes ? array_sum($sizes) : (float) ($line['qty'] ?? 0);
+            // A type whose total is the sum of part columns (PP Sample: buyer's + SFL's).
+            if ($parts = ManualChallanTypes::get($type)['total_of'] ?? null) {
+                $line['qty'] = (float) collect($parts)->sum(fn ($p) => (float) ($line[$p] ?? 0));
+            }
             if (! in_array('hanger_carton', $on, true)) {
                 $line['hanger_carton'] = null;
             }

@@ -4,7 +4,7 @@
     $editing = $challan->exists;
     // Ticked green columns (old input after a failed submit wins).
     $on = array_values(array_intersect(\ME\SflInventory\Support\ManualChallanTypes::optionalColumns($type), (array) old('optional_columns', $challan->optional_columns ?? [])));
-    $lines = old('items', $editing ? $challan->items->map(fn ($i) => $i->only(['description', 'po_no', 'style', 'item_code', 'color', 'size', 'sizes', 'qty', 'unit', 'hanger_carton', 'remarks']))->all() : []);
+    $lines = old('items', $editing ? $challan->items->map(fn ($i) => $i->only(['description', 'po_no', 'style', 'item_code', 'color', 'size', 'sizes', 'buyer_sample_qty', 'sfl_sample_qty', 'qty', 'unit', 'hanger_carton', 'remarks']))->all() : []);
     if (empty($lines)) {
         $lines = [[], []];
     }
@@ -142,6 +142,14 @@
             // Size-wise qty typed: Total Qty is their sum.
             qty.readOnly = sum > 0;
             if (sum > 0) { qty.value = fmt(sum); }
+            // Part quantities (PP Sample: buyer's + SFL's): Total Qty is always their sum.
+            const parts = row.querySelectorAll('[data-part]');
+            if (parts.length) {
+                let p = 0;
+                parts.forEach(function (i) { p += num(i.value); });
+                qty.readOnly = true;
+                qty.value = fmt(p);
+            }
             grand += num(qty.value);
         });
         sizes.forEach(function (s) {
