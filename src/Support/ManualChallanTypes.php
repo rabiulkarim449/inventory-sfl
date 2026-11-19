@@ -1,0 +1,40 @@
+<?php
+
+namespace ME\SflInventory\Support;
+
+/**
+ * The Manual Delivery Challan types. Each type has its own menu, list, form
+ * and print layout; all share one Challan No series.
+ *
+ * To add a type: add it here (and its print partial), and a menu line in
+ * Config/sidebar.php. No migration — the line table holds every column.
+ */
+class ManualChallanTypes
+{
+    /** Sizes of the Shipment & Sizeset size-wise columns, in print order. */
+    public const SIZES = ['XS', 'S', 'M', 'XM', 'L', 'XL', '2XL', '3XL'];
+
+    public const TYPES = [
+        'shipment' => [
+            'title' => 'Delivery Challan for Shipment & Sizeset',
+            'menu' => 'Shipment & Sizeset',
+            // Green columns: size-wise qty and Hanger / Carton, shown on demand.
+            'optional' => true,
+        ],
+    ];
+
+    public static function all(): array
+    {
+        return self::TYPES;
+    }
+
+    public static function exists(string $type): bool
+    {
+        return isset(self::TYPES[$type]);
+    }
+
+    public static function get(string $type): array
+    {
+        return self::TYPES[$type] ?? abort(404);
+    }
+}

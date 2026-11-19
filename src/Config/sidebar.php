@@ -119,6 +119,18 @@ return [
                     ],
                 ],
                 [
+                    // Typed-by-hand delivery challans (no order / stock link) — one menu per type.
+                    'title'      => 'Manual Challan',
+                    'icon'       => 'fa-solid fa-file-signature',
+                    'icon_color' => 'text-primary',
+                    'permission' => '',
+                    'children'   => array_values(array_map(
+                        fn ($key, $t) => ['title' => $t['menu'], 'icon' => 'fa-solid fa-file-lines', 'icon_color' => 'text-primary', 'permission' => 'inv_manual_challan', 'route' => "$base/manual-challans/$key"],
+                        array_keys(\ME\SflInventory\Support\ManualChallanTypes::all()),
+                        \ME\SflInventory\Support\ManualChallanTypes::all()
+                    )),
+                ],
+                [
                     'title'      => 'Stock Adjustment',
                     'icon'       => 'fa-solid fa-scale-unbalanced',
                     'icon_color' => 'text-danger',

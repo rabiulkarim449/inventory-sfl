@@ -153,6 +153,21 @@ Route::middleware($route['middleware'] ?? ['web', 'auth'])
         Route::resource('sample-challans', SampleChallanController::class)->parameters(['sample-challans' => 'sample_challan']);
         Route::get('sample-challans/{sample_challan}/print', [SampleChallanController::class, 'print'])->name('sample-challans.print');
 
+        // Manual Delivery Challan — typed by hand, one URL segment per type (see ManualChallanTypes).
+        Route::prefix('manual-challans/{type}')->whereIn('type', array_keys(\ME\SflInventory\Support\ManualChallanTypes::all()))
+            ->name('manual-challans.')->controller(\ME\SflInventory\Http\Controllers\ManualChallanController::class)->group(function () {
+                Route::get('/', 'index')->name('index');
+                Route::get('create', 'create')->name('create');
+                Route::post('/', 'store')->name('store');
+                Route::get('{challan}', 'show')->whereNumber('challan')->name('show');
+                Route::get('{challan}/edit', 'edit')->whereNumber('challan')->name('edit');
+                Route::put('{challan}', 'update')->whereNumber('challan')->name('update');
+                Route::delete('{challan}', 'destroy')->whereNumber('challan')->name('destroy');
+                Route::get('{challan}/print', 'print')->whereNumber('challan')->name('print');
+                Route::post('{challan}/approve', 'approve')->whereNumber('challan')->name('approve');
+                Route::post('{challan}/reject', 'reject')->whereNumber('challan')->name('reject');
+            });
+
         // Internal Stock Transfer + Production Consumption
         Route::resource('transfers', InvStockTransferController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy']);
         Route::post('transfers/{transfer}/approve', [InvStockTransferController::class, 'approve'])->name('transfers.approve');

@@ -101,6 +101,10 @@ return [
             'label' => 'Sample Delivery Challan',
             'permissions' => $crud + ['print' => 'Print'],
         ],
+        'inv_manual_challan' => [
+            'label' => 'Manual Delivery Challan (all 4 types)',
+            'permissions' => $crud + ['approve' => 'Approve / Reject', 'print' => 'Print'],
+        ],
         'inv_transfer' => [
             'label' => 'Internal Stock Transfer',
             'permissions' => $crud + ['approve' => 'Approve', 'receive' => 'Receive', 'print' => 'Print', 'export' => 'Export', 'force_delete' => 'Force Delete'],
