@@ -1,8 +1,9 @@
-{{-- props: challan, class (table class), minRows (blank rows to pad a printed sheet). Shipment & Sizeset lines. --}}
+{{-- props: challan, class (table class), minRows (blank rows to pad a printed sheet).
+     Shipment & Sizeset lines: only the green columns ticked on this challan appear. --}}
 @php
-    $sizes = \ME\SflInventory\Support\ManualChallanTypes::SIZES;
-    $opt = $challan->show_optional;
-    $cols = 5 + ($opt ? count($sizes) : 0) + 2 + ($opt ? 1 : 0) + 1;
+    $sizes = $challan->optionalSizes();
+    $hanger = $challan->optionalOn('hanger_carton');
+    $cols = 5 + count($sizes) + 2 + ($hanger ? 1 : 0) + 1;
     $unit = $challan->items->pluck('unit')->filter()->unique();
 @endphp
 <table class="{{ $class ?? 'table table-bordered table-sm' }}">
@@ -13,12 +14,10 @@
             <th>PO NUMBER</th>
             <th>STYLE</th>
             <th>COLOR</th>
-            @if($opt)
-                @foreach($sizes as $size)<th>{{ $size }}</th>@endforeach
-            @endif
+            @foreach($sizes as $size)<th>{{ $size }}</th>@endforeach
             <th>TOTAL QTY.</th>
             <th>UNIT</th>
-            @if($opt)<th>HANGER/<br>CARTON</th>@endif
+            @if($hanger)<th>HANGER/<br>CARTON</th>@endif
             <th>REMARKS</th>
         </tr>
     </thead>
@@ -30,12 +29,10 @@
                 <td>{{ $item->po_no }}</td>
                 <td>{{ $item->style }}</td>
                 <td>{{ $item->color }}</td>
-                @if($opt)
-                    @foreach($sizes as $size)<td>{{ $item->sizeQty($size) ? inv_qty($item->sizeQty($size)) : '' }}</td>@endforeach
-                @endif
+                @foreach($sizes as $size)<td>{{ $item->sizeQty($size) ? inv_qty($item->sizeQty($size)) : '' }}</td>@endforeach
                 <td>{{ inv_qty($item->qty) }}</td>
                 <td>{{ $item->unit }}</td>
-                @if($opt)<td>{{ $item->hanger_carton }}</td>@endif
+                @if($hanger)<td>{{ $item->hanger_carton }}</td>@endif
                 <td class="text-left">{{ $item->remarks }}</td>
             </tr>
         @endforeach
@@ -46,15 +43,13 @@
     <tfoot>
         <tr>
             <td colspan="5" class="text-right">Total</td>
-            @if($opt)
-                @foreach($sizes as $size)
-                    @php $sizeTotal = $challan->items->sum(fn ($i) => $i->sizeQty($size)); @endphp
-                    <td>{{ $sizeTotal ? inv_qty($sizeTotal) : '' }}</td>
-                @endforeach
-            @endif
+            @foreach($sizes as $size)
+                @php $sizeTotal = $challan->items->sum(fn ($i) => $i->sizeQty($size)); @endphp
+                <td>{{ $sizeTotal ? inv_qty($sizeTotal) : '' }}</td>
+            @endforeach
             <td>{{ inv_qty($challan->totalQty()) }}</td>
             <td>{{ $unit->count() === 1 ? $unit->first() : '' }}</td>
-            @if($opt)<td></td>@endif
+            @if($hanger)<td></td>@endif
             <td></td>
         </tr>
     </tfoot>

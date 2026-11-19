@@ -4,7 +4,7 @@
 
 @push('css')
 <style>
-    @page { size: A4 {{ $challan->show_optional ? 'landscape' : 'portrait' }}; margin: 10mm; }
+    @page { size: A4 {{ count($challan->optional_columns ?? []) > 3 ? 'landscape' : 'portrait' }}; margin: 10mm; }
     .mc-head { text-align: center; margin-bottom: 4px; }
     .mc-head .mc-name { font-size: 22px; font-weight: 800; letter-spacing: .5px; }
     .mc-head .mc-addr { font-size: 11px; font-weight: 600; }

@@ -2,13 +2,20 @@
 
 @php
     $editing = $challan->exists;
-    $optional = ! empty($info['optional']);
-    $showOptional = (bool) old('show_optional', $challan->show_optional);
+    // Ticked green columns (old input after a failed submit wins).
+    $on = array_values(array_intersect(\ME\SflInventory\Support\ManualChallanTypes::optionalColumns($type), (array) old('optional_columns', $challan->optional_columns ?? [])));
     $lines = old('items', $editing ? $challan->items->map(fn ($i) => $i->only(['description', 'po_no', 'style', 'item_code', 'color', 'size', 'sizes', 'qty', 'unit', 'hanger_carton', 'remarks']))->all() : []);
     if (empty($lines)) {
-        $lines = [[]];
+        $lines = [[], []];
     }
     $pageTitle = ($editing ? 'Edit ' : 'New ') . $info['title'];
+    $greenHeader = function (string $key, string $label) use ($on) {
+        $id = 'mcCol_' . $key;
+        return '<label class="mb-0 d-flex flex-column align-items-center" for="' . $id . '" style="cursor:pointer">'
+            . '<span>' . e($label) . '</span>'
+            . '<input type="checkbox" class="mt-1" name="optional_columns[]" value="' . e($key) . '" id="' . $id . '" data-col-toggle="' . e($key) . '"' . (in_array($key, $on, true) ? ' checked' : '') . '>'
+            . '</label>';
+    };
 @endphp
 
 @section('title')
@@ -23,10 +30,12 @@
     .mc-optional { background: #dcfce7 !important; }
     .mc-lines th { white-space: nowrap; font-size: 12px; vertical-align: middle; text-align: center; }
     .mc-lines td { padding: 2px; vertical-align: middle; }
-    .mc-lines input { min-width: 60px; }
+    .mc-lines input[type=text], .mc-lines input[type=number] { min-width: 60px; }
     .mc-lines .mc-size input { min-width: 46px; width: 52px; text-align: right; }
     .mc-lines .mc-qty input { width: 80px; text-align: right; }
-    .mc-hide-optional .mc-opt { display: none; }
+    /* An unticked green column: grey, empty and not writable. */
+    .mc-lines input[data-col][readonly] { background: #f1f5f9; cursor: not-allowed; }
+    .mc-lines input[data-qty][readonly] { background: #f8fafc; }
 </style>
 @endpush
 
@@ -45,7 +54,7 @@
                 <div class="alert alert-danger small"><ul class="mb-0">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>
             @endif
 
-            <form method="POST" action="{{ $editing ? route('inventory.manual-challans.update', [$type, $challan]) : route('inventory.manual-challans.store', $type) }}" id="mcForm" class="{{ $showOptional ? '' : 'mc-hide-optional' }}">
+            <form method="POST" action="{{ $editing ? route('inventory.manual-challans.update', [$type, $challan]) : route('inventory.manual-challans.store', $type) }}" id="mcForm">
                 @csrf
                 @if($editing) @method('PUT') @endif
 
@@ -81,14 +90,7 @@
                     </div>
                 </div>
 
-                @if($optional)
-                    <div class="custom-control custom-switch mb-2">
-                        <input type="hidden" name="show_optional" value="0">
-                        <input type="checkbox" name="show_optional" value="1" class="custom-control-input" id="mcShowOptional" @checked($showOptional)>
-                        <label class="custom-control-label" for="mcShowOptional"><span class="mc-optional px-1">Show size-wise qty and Hanger / Carton</span></label>
-                    </div>
-                @endif
-
+                <p class="small text-muted mb-1"><span class="mc-optional px-1">Green</span> columns are optional: tick one in the header to fill it in. Only ticked columns are printed.</p>
                 <div class="table-responsive">
                     <table class="table table-bordered table-sm mc-lines">
                         <thead>
@@ -99,25 +101,25 @@
                                 <th>Style</th>
                                 <th>Color</th>
                                 @foreach($sizes as $size)
-                                    <th class="mc-opt mc-optional">{{ $size }}</th>
+                                    <th class="mc-optional">{!! $greenHeader($size, $size) !!}</th>
                                 @endforeach
                                 <th>Total Qty</th>
                                 <th>Unit</th>
-                                <th class="mc-opt mc-optional">Hanger / Carton</th>
+                                <th class="mc-optional">{!! $greenHeader('hanger_carton', 'Hanger / Carton') !!}</th>
                                 <th>Remarks</th>
                                 <th style="width:36px"></th>
                             </tr>
                         </thead>
                         <tbody id="mcRows">
                             @foreach($lines as $i => $line)
-                                @include('sfl-inventory::admin.manual-challans.partials.shipment-row', ['index' => $i, 'line' => $line])
+                                @include('sfl-inventory::admin.manual-challans.partials.shipment-row', ['index' => $i, 'line' => $line, 'on' => $on])
                             @endforeach
                         </tbody>
                         <tfoot>
                             <tr class="font-weight-bold">
                                 <td colspan="5" class="text-right">Total</td>
                                 @foreach($sizes as $size)
-                                    <td class="mc-opt text-right" data-size-total="{{ $size }}"></td>
+                                    <td class="text-right" data-size-total="{{ $size }}"></td>
                                 @endforeach
                                 <td class="text-right" id="mcGrandTotal"></td>
                                 <td colspan="4"></td>
@@ -126,7 +128,7 @@
                     </table>
                 </div>
                 <template id="mcRowTemplate">
-                    @include('sfl-inventory::admin.manual-challans.partials.shipment-row', ['index' => '__INDEX__', 'line' => []])
+                    @include('sfl-inventory::admin.manual-challans.partials.shipment-row', ['index' => '__INDEX__', 'line' => [], 'on' => []])
                 </template>
                 <button type="button" class="btn btn-sm ui-act ui-act-create" id="mcAddRow" title="Add Line"><i class="fa-solid fa-plus"></i> Add Line</button>
 
@@ -143,14 +145,23 @@
 @push('js')
 <script>
 (function () {
-    const form = document.getElementById('mcForm');
     const body = document.getElementById('mcRows');
     const sizes = @json($sizes);
     let next = 100000;
 
     function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
     function fmt(n) { return n ? (Math.round(n * 100) / 100).toString() : ''; }
-    function optionalOn() { return !form.classList.contains('mc-hide-optional'); }
+    function ticked(col) { const box = document.querySelector('[data-col-toggle="' + col + '"]'); return !!(box && box.checked); }
+
+    // Ticked column: writable. Unticked: emptied and read-only.
+    function applyColumn(col) {
+        const on = ticked(col);
+        body.querySelectorAll('[data-col="' + col + '"]').forEach(function (input) {
+            input.readOnly = !on;
+            input.tabIndex = on ? 0 : -1;
+            if (!on) { input.value = ''; }
+        });
+    }
 
     function recalc() {
         const sizeTotals = {};
@@ -158,19 +169,15 @@
         body.querySelectorAll('tr').forEach(function (row, i) {
             row.querySelector('[data-sl]').textContent = i + 1;
             const qty = row.querySelector('[data-qty]');
-            if (optionalOn()) {
-                let sum = 0;
-                sizes.forEach(function (s) {
-                    const v = num(row.querySelector('[data-size="' + s + '"]').value);
-                    sum += v;
-                    sizeTotals[s] = (sizeTotals[s] || 0) + v;
-                });
-                // Size-wise qty typed: Total Qty is their sum.
-                qty.readOnly = sum > 0;
-                if (sum > 0) { qty.value = fmt(sum); }
-            } else {
-                qty.readOnly = false;
-            }
+            let sum = 0;
+            sizes.forEach(function (s) {
+                const v = num(row.querySelector('[data-size="' + s + '"]').value);
+                sum += v;
+                sizeTotals[s] = (sizeTotals[s] || 0) + v;
+            });
+            // Size-wise qty typed: Total Qty is their sum.
+            qty.readOnly = sum > 0;
+            if (sum > 0) { qty.value = fmt(sum); }
             grand += num(qty.value);
         });
         sizes.forEach(function (s) {
@@ -180,23 +187,30 @@
         document.getElementById('mcGrandTotal').textContent = fmt(grand);
     }
 
-    document.getElementById('mcAddRow').addEventListener('click', function () {
-        const html = document.getElementById('mcRowTemplate').innerHTML.replace(/__INDEX__/g, next++);
-        body.insertAdjacentHTML('beforeend', html);
+    function applyAll() {
+        document.querySelectorAll('[data-col-toggle]').forEach(function (box) { applyColumn(box.dataset.colToggle); });
         recalc();
+    }
+
+    document.getElementById('mcAddRow').addEventListener('click', function () {
+        body.insertAdjacentHTML('beforeend', document.getElementById('mcRowTemplate').innerHTML.replace(/__INDEX__/g, next++));
+        applyAll();
     });
     body.addEventListener('click', function (e) {
         const btn = e.target.closest('[data-remove]');
         if (!btn) { return; }
-        if (body.querySelectorAll('tr').length > 1) { btn.closest('tr').remove(); } else { btn.closest('tr').querySelectorAll('input').forEach(function (i) { i.value = i.dataset.default || ''; }); }
+        if (body.querySelectorAll('tr').length > 1) {
+            btn.closest('tr').remove();
+        } else {
+            btn.closest('tr').querySelectorAll('input').forEach(function (i) { i.value = i.dataset.default || ''; });
+        }
         recalc();
     });
     body.addEventListener('input', recalc);
-    const toggle = document.getElementById('mcShowOptional');
-    if (toggle) {
-        toggle.addEventListener('change', function () { form.classList.toggle('mc-hide-optional', !toggle.checked); recalc(); });
-    }
-    recalc();
+    document.querySelectorAll('[data-col-toggle]').forEach(function (box) {
+        box.addEventListener('change', function () { applyColumn(box.dataset.colToggle); recalc(); });
+    });
+    applyAll();
 })();
 </script>
 @endpush

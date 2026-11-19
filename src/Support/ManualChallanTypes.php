@@ -18,10 +18,16 @@ class ManualChallanTypes
         'shipment' => [
             'title' => 'Delivery Challan for Shipment & Sizeset',
             'menu' => 'Shipment & Sizeset',
-            // Green columns: size-wise qty and Hanger / Carton, shown on demand.
-            'optional' => true,
+            // Green columns: each size and Hanger / Carton, ticked one by one on the form.
+            'optional' => [...self::SIZES, 'hanger_carton'],
         ],
     ];
+
+    /** Green columns a type allows (empty for a type without any). */
+    public static function optionalColumns(string $type): array
+    {
+        return self::get($type)['optional'] ?? [];
+    }
 
     public static function all(): array
     {

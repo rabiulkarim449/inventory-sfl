@@ -23,8 +23,8 @@ return new class extends Migration
             $table->string('to_name');
             $table->string('to_address')->nullable();
             $table->string('to_contact', 100)->nullable();
-            // Green (optional) columns of this challan shown / printed.
-            $table->boolean('show_optional')->default(false);
+            // Green (optional) columns ticked on this challan, e.g. ["S","M","hanger_carton"]; only these are filled and printed.
+            $table->json('optional_columns')->nullable();
             $table->string('status', 20)->default('pending')->index();
             $table->unsignedBigInteger('approved_by')->nullable();
             $table->timestamp('approved_at')->nullable();

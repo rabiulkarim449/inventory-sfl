@@ -29,11 +29,11 @@ class ManualChallan extends Model
     protected $table = 'inv_manual_challans';
 
     protected $fillable = [
-        'type', 'challan_no', 'challan_date', 'to_name', 'to_address', 'to_contact', 'show_optional',
+        'type', 'challan_no', 'challan_date', 'to_name', 'to_address', 'to_contact', 'optional_columns',
         'status', 'approved_by', 'approved_at', 'approval_remarks', 'created_by',
     ];
 
-    protected $casts = ['challan_date' => 'date', 'approved_at' => 'datetime', 'show_optional' => 'boolean'];
+    protected $casts = ['challan_date' => 'date', 'approved_at' => 'datetime', 'optional_columns' => 'array'];
 
     /**
      * Next Challan No for a date: ddmmyy + 3-digit serial, e.g. 191126001.
@@ -52,6 +52,18 @@ class ManualChallan extends Model
     public function typeInfo(): array
     {
         return ManualChallanTypes::get($this->type);
+    }
+
+    /** A green (optional) column ticked on this challan. */
+    public function optionalOn(string $column): bool
+    {
+        return in_array($column, $this->optional_columns ?? [], true);
+    }
+
+    /** The sizes ticked on this challan, in print order. */
+    public function optionalSizes(): array
+    {
+        return array_values(array_filter(ManualChallanTypes::SIZES, fn ($s) => $this->optionalOn($s)));
     }
 
     public function isPending(): bool

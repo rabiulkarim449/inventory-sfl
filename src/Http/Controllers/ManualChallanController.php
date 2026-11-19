@@ -46,7 +46,7 @@ class ManualChallanController extends Controller
     {
         $this->authorize(self::PERM . '.add');
 
-        $challan = new ManualChallan(['type' => $type, 'challan_date' => today(), 'show_optional' => false]);
+        $challan = new ManualChallan(['type' => $type, 'challan_date' => today(), 'optional_columns' => []]);
 
         return view('sfl-inventory::admin.manual-challans.form', $this->formData($type, $challan));
     }
@@ -69,7 +69,7 @@ class ManualChallanController extends Controller
                         'to_name' => $data['to_name'],
                         'to_address' => $data['to_address'] ?? null,
                         'to_contact' => $data['to_contact'] ?? null,
-                        'show_optional' => $data['show_optional'],
+                        'optional_columns' => $data['optional_columns'],
                         'status' => 'pending',
                         'created_by' => auth()->id(),
                     ]);
@@ -123,7 +123,7 @@ class ManualChallanController extends Controller
                 'to_name' => $data['to_name'],
                 'to_address' => $data['to_address'] ?? null,
                 'to_contact' => $data['to_contact'] ?? null,
-                'show_optional' => $data['show_optional'],
+                'optional_columns' => $data['optional_columns'],
             ]);
             $this->saveItems($challan, $data['items']);
         });
@@ -202,13 +202,14 @@ class ManualChallanController extends Controller
     /** Validated header + lines; blank lines are dropped, at least one must remain. */
     private function validated(Request $request, string $type, bool $creating): array
     {
-        $optional = ! empty(ManualChallanTypes::get($type)['optional']);
+        $allowed = ManualChallanTypes::optionalColumns($type);
         $data = $request->validate([
             'challan_date' => [$creating ? 'required' : 'nullable', 'date'],
             'to_name' => ['required', 'string', 'max:255'],
             'to_address' => ['nullable', 'string', 'max:255'],
             'to_contact' => ['nullable', 'string', 'max:100'],
-            'show_optional' => ['nullable', 'boolean'],
+            'optional_columns' => ['nullable', 'array'],
+            'optional_columns.*' => ['string'],
             'items' => ['required', 'array'],
             'items.*.description' => ['nullable', 'string', 'max:255'],
             'items.*.po_no' => ['nullable', 'string', 'max:100'],
@@ -226,15 +227,16 @@ class ManualChallanController extends Controller
             'items.*.remarks' => ['nullable', 'string', 'max:255'],
         ], [], ['to_name' => 'To', 'challan_date' => 'Date']);
 
-        $data['show_optional'] = $optional && $request->boolean('show_optional');
-        $data['items'] = collect($data['items'])->map(function ($line) use ($data) {
-            $sizes = $data['show_optional']
-                ? collect($line['sizes'] ?? [])->only(ManualChallanTypes::SIZES)->map(fn ($v) => (float) $v)->filter(fn ($v) => $v > 0)->all()
-                : [];
+        // Ticked green columns, kept in the type's own order; anything typed in an unticked one is dropped.
+        $on = array_values(array_intersect($allowed, $data['optional_columns'] ?? []));
+        $data['optional_columns'] = $on;
+        $data['items'] = collect($data['items'])->map(function ($line) use ($on) {
+            $sizes = collect($line['sizes'] ?? [])->only(array_intersect(ManualChallanTypes::SIZES, $on))
+                ->map(fn ($v) => (float) $v)->filter(fn ($v) => $v > 0)->all();
             $line['sizes'] = $sizes ?: null;
             // Size-wise qty given: the total is their sum.
             $line['qty'] = $sizes ? array_sum($sizes) : (float) ($line['qty'] ?? 0);
-            if (! $data['show_optional']) {
+            if (! in_array('hanger_carton', $on, true)) {
                 $line['hanger_carton'] = null;
             }
 
