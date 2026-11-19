@@ -85,7 +85,8 @@
                                     <input type="text" class="form-control form-control-sm mc-auto" value="{{ $challan->challan_date->format('d M Y') }}" readonly>
                                     <div class="form-text small">Fixed with the Challan No.</div>
                                 @else
-                                    <input type="date" name="challan_date" class="form-control form-control-sm mc-auto" value="{{ old('challan_date', $challan->challan_date?->format('Y-m-d')) }}" required>
+                                    {{-- Not blue: the user can change it, so it is not an automatic field. --}}
+                                    <input type="date" name="challan_date" class="form-control form-control-sm" value="{{ old('challan_date', $challan->challan_date?->format('Y-m-d')) }}" required>
                                     <div class="form-text small">Today by default — change it for an old challan.</div>
                                 @endif
                             </div>
