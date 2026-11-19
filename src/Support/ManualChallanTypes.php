@@ -26,6 +26,10 @@ class ManualChallanTypes
             'title' => 'Delivery Challan for Inventory & Return',
             'menu' => 'Inventory & Return',
         ],
+        'marketing' => [
+            'title' => 'Delivery Challan for Marketing & Development Sample',
+            'menu' => 'Marketing & Development Sample',
+        ],
     ];
 
     /** Green columns a type allows (empty for a type without any). */
