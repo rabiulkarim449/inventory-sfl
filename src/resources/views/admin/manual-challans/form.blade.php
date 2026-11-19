@@ -11,9 +11,9 @@
     $pageTitle = ($editing ? 'Edit ' : 'New ') . $info['title'];
     $greenHeader = function (string $key, string $label) use ($on) {
         $id = 'mcCol_' . $key;
-        return '<label class="mb-0 d-flex flex-column align-items-center" for="' . $id . '" style="cursor:pointer">'
+        return '<label class="mb-0 d-inline-flex align-items-center" for="' . $id . '" style="cursor:pointer;gap:4px">'
+            . '<input type="checkbox" class="m-0" name="optional_columns[]" value="' . e($key) . '" id="' . $id . '" data-col-toggle="' . e($key) . '"' . (in_array($key, $on, true) ? ' checked' : '') . '>'
             . '<span>' . e($label) . '</span>'
-            . '<input type="checkbox" class="mt-1" name="optional_columns[]" value="' . e($key) . '" id="' . $id . '" data-col-toggle="' . e($key) . '"' . (in_array($key, $on, true) ? ' checked' : '') . '>'
             . '</label>';
     };
 @endphp
@@ -26,7 +26,6 @@
 <style>
     /* Field colours as on the client's sheet: blue = automatic, yellow = typed, green = optional. */
     .mc-auto { background: #dbeafe !important; }
-    .mc-typed-label { background: #fef08a; padding: 0 4px; border-radius: 3px; }
     .mc-optional { background: #dcfce7 !important; }
     .mc-lines th { white-space: nowrap; font-size: 12px; vertical-align: middle; text-align: center; }
     .mc-lines td { padding: 2px; vertical-align: middle; }
@@ -58,35 +57,39 @@
                 @csrf
                 @if($editing) @method('PUT') @endif
 
+                {{-- As on the paper challan: who it goes to on the left, Challan No and Date on the right. --}}
                 <div class="row">
-                    <div class="col-md-3 mb-3">
-                        <label class="form-label">Challan No</label>
-                        <input type="text" class="form-control form-control-sm mc-auto" value="{{ $editing ? $challan->challan_no : 'Given on Submit' }}" readonly>
+                    <div class="col-lg-7">
+                        <div class="form-group row mb-2">
+                            <label class="col-sm-3 col-form-label col-form-label-sm">To <span class="text-danger">*</span></label>
+                            <div class="col-sm-9"><input type="text" name="to_name" class="form-control form-control-sm" value="{{ old('to_name', $challan->to_name) }}" required maxlength="255"></div>
+                        </div>
+                        <div class="form-group row mb-2">
+                            <label class="col-sm-3 col-form-label col-form-label-sm">Address</label>
+                            <div class="col-sm-9"><input type="text" name="to_address" class="form-control form-control-sm" value="{{ old('to_address', $challan->to_address) }}" maxlength="255"></div>
+                        </div>
+                        <div class="form-group row mb-2">
+                            <label class="col-sm-3 col-form-label col-form-label-sm">Contact No</label>
+                            <div class="col-sm-9"><input type="text" name="to_contact" class="form-control form-control-sm" value="{{ old('to_contact', $challan->to_contact) }}" maxlength="100"></div>
+                        </div>
                     </div>
-                    <div class="col-md-3 mb-3">
-                        <label class="form-label">Date <span class="text-danger">*</span></label>
-                        @if($editing)
-                            <input type="text" class="form-control form-control-sm mc-auto" value="{{ $challan->challan_date->format('d M Y') }}" readonly>
-                            <div class="form-text">Fixed with the Challan No.</div>
-                        @else
-                            <input type="date" name="challan_date" class="form-control form-control-sm mc-auto" value="{{ old('challan_date', $challan->challan_date?->format('Y-m-d')) }}" required>
-                            <div class="form-text">Today by default — pick an earlier date for an old challan.</div>
-                        @endif
-                    </div>
-                </div>
-
-                <div class="row">
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label"><span class="mc-typed-label">To</span> <span class="text-danger">*</span></label>
-                        <input type="text" name="to_name" class="form-control form-control-sm" value="{{ old('to_name', $challan->to_name) }}" required maxlength="255">
-                    </div>
-                    <div class="col-md-5 mb-3">
-                        <label class="form-label"><span class="mc-typed-label">Address</span></label>
-                        <input type="text" name="to_address" class="form-control form-control-sm" value="{{ old('to_address', $challan->to_address) }}" maxlength="255">
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <label class="form-label"><span class="mc-typed-label">Contact No</span></label>
-                        <input type="text" name="to_contact" class="form-control form-control-sm" value="{{ old('to_contact', $challan->to_contact) }}" maxlength="100">
+                    <div class="col-lg-4 offset-lg-1">
+                        <div class="form-group row mb-2">
+                            <label class="col-sm-4 col-form-label col-form-label-sm">Challan No</label>
+                            <div class="col-sm-8"><input type="text" class="form-control form-control-sm mc-auto" value="{{ $editing ? $challan->challan_no : 'Given on Submit' }}" readonly></div>
+                        </div>
+                        <div class="form-group row mb-2">
+                            <label class="col-sm-4 col-form-label col-form-label-sm">Date <span class="text-danger">*</span></label>
+                            <div class="col-sm-8">
+                                @if($editing)
+                                    <input type="text" class="form-control form-control-sm mc-auto" value="{{ $challan->challan_date->format('d M Y') }}" readonly>
+                                    <div class="form-text small">Fixed with the Challan No.</div>
+                                @else
+                                    <input type="date" name="challan_date" class="form-control form-control-sm mc-auto" value="{{ old('challan_date', $challan->challan_date?->format('Y-m-d')) }}" required>
+                                    <div class="form-text small">Today by default — change it for an old challan.</div>
+                                @endif
+                            </div>
+                        </div>
                     </div>
                 </div>
 
