@@ -5,15 +5,15 @@
         <input type="text" name="name" class="form-control form-control-sm" value="{{ old('name', $machine?->name ?? '') }}" required>
     </div>
     <div class="col-md-3 mb-3">
-        <label class="form-label">Machine Code <span class="text-danger">*</span></label>
+        <label class="form-label">Machine No <span class="text-danger">*</span></label>
         <input type="text" name="code" class="form-control form-control-sm" value="{{ old('code', $machine?->code ?? '') }}" required>
     </div>
 </div>
 <div class="row">
     <div class="col-md-3 mb-3">
-        <label class="form-label">Machine No</label>
-        <input type="text" name="machine_no" class="form-control form-control-sm" placeholder="e.g. B.A, B.St, SN2" value="{{ old('machine_no', $machine?->machine_no ?? '') }}">
-        <div class="form-text">The floor's own machine tag — this is what prints in the "Machine No" column on reports.</div>
+        <label class="form-label">Serial No</label>
+        <input type="text" name="machine_no" class="form-control form-control-sm" placeholder="Maker's serial, e.g. 22070921282" value="{{ old('machine_no', $machine?->machine_no ?? '') }}">
+        <div class="form-text">The serial number on the machine. Reports and pickers show the Machine No above.</div>
     </div>
     <div class="col-md-6"></div>
 </div>

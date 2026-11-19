@@ -120,7 +120,7 @@
                             <td class="text-center">{{ $row->line_no }}</td>
                             <td>{{ $row->needle_type }}</td>
                             <td class="text-center">{{ $row->needle_size }}</td>
-                            <td>{{ $row->machine?->machine_no ?? $row->machine?->code ?? '' }}</td>
+                            <td>{{ $row->machine?->code ?? '' }}</td>
                             <td></td>
                             <td>{{ $row->employee?->name ?? '' }}</td>
                             <td class="text-center">{{ $row->employee?->employee_id ?? $row->employee_id }}</td>

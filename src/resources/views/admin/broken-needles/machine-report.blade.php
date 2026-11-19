@@ -85,7 +85,7 @@
                         @if($machine)
                             <tr><th>#</th><th>Employee ID</th><th>Employee Name</th><th class="text-right">Incidents</th><th class="text-right">Total Broken Needle Qty</th></tr>
                         @else
-                            <tr><th>#</th><th>Machine</th><th>Code</th><th>Department</th><th>Section</th><th>Line</th><th class="text-right">Incidents</th><th class="text-right">Total Broken Needle Qty</th></tr>
+                            <tr><th>#</th><th>Machine</th><th>Machine No</th><th>Department</th><th>Section</th><th>Line</th><th class="text-right">Incidents</th><th class="text-right">Total Broken Needle Qty</th></tr>
                         @endif
                     </thead>
                     <tbody>

@@ -20,7 +20,8 @@ class InvMachineController extends Controller
             ->with(['department', 'brand'])
             ->when($request->filled('search'), fn ($q) => $q->where(function ($q) use ($request) {
                 $q->where('name', 'like', '%' . $request->search . '%')
-                    ->orWhere('code', 'like', '%' . $request->search . '%');
+                    ->orWhere('code', 'like', '%' . $request->search . '%')
+                    ->orWhere('machine_no', 'like', '%' . $request->search . '%');
             }))
             ->when($request->filled('department_id'), fn ($q) => $q->where('department_id', $request->department_id))
             ->when($request->filled('status'), fn ($q) => $q->where('is_active', $request->status === 'active'))

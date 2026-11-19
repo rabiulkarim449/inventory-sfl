@@ -29,7 +29,7 @@ class BrokenNeedleMachineSheet implements FromArray, ShouldAutoSize, WithEvents,
             ['Broken Needle — Machine Wise Report'],
             [$this->periodLabel()],
             [''],
-            ['#', 'Machine', 'Code', 'Department', 'Section', 'Line', 'Incidents', 'Total Broken Needle Qty'],
+            ['#', 'Machine', 'Machine No', 'Department', 'Section', 'Line', 'Incidents', 'Total Broken Needle Qty'],
         ];
 
         foreach ($this->rows as $i => $row) {

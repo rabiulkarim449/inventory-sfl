@@ -33,4 +33,10 @@ class InvMachineRequest extends FormRequest
             'is_active'     => ['nullable', 'boolean'],
         ];
     }
+
+    /** Field names in error messages, as the form labels them. */
+    public function attributes(): array
+    {
+        return ['code' => 'Machine No', 'machine_no' => 'Serial No'];
+    }
 }

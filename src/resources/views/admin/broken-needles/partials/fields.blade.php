@@ -26,7 +26,7 @@
         <select name="machine_id" class="form-control form-control-sm inv-select2" required>
             <option value="">— Select —</option>
             @foreach($machines as $machine)
-                <option value="{{ $machine->id }}" @selected(old('machine_id', $entry?->machine_id ?? '') == $machine->id)>{{ $machine->name }} ({{ $machine->machine_no ?? $machine->code }})</option>
+                <option value="{{ $machine->id }}" @selected(old('machine_id', $entry?->machine_id ?? '') == $machine->id)>{{ $machine->name }} ({{ $machine->code }})</option>
             @endforeach
         </select>
         <div class="form-text">Line No on the report comes from this machine's assigned line.</div>

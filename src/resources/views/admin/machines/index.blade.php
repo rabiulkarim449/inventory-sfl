@@ -24,7 +24,7 @@
         <div class="card-body">
             <form method="GET" class="row mb-3 align-items-end">
                 <div class="col-md-3 mb-2">
-                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Search name or code" value="{{ request('search') }}">
+                    <input type="text" name="search" class="form-control form-control-sm" placeholder="Search name, machine no or serial" value="{{ request('search') }}">
                 </div>
                 <div class="col-md-3 mb-2">
                     <select name="department_id" class="form-control form-control-sm inv-select2">
@@ -50,7 +50,7 @@
             <div class="table-responsive">
                 <table class="table table-bordered table-sm align-middle">
                     <thead>
-                        <tr><th>#</th><th>Name</th><th>Code</th><th>Machine No</th><th>Brand</th><th>Model</th><th>Type</th><th>Department</th><th>Section</th><th>Line</th><th>Status</th><th class="text-right">Actions</th></tr>
+                        <tr><th>#</th><th>Name</th><th>Machine No</th><th>Serial No</th><th>Brand</th><th>Model</th><th>Type</th><th>Department</th><th>Section</th><th>Line</th><th>Status</th><th class="text-right">Actions</th></tr>
                     </thead>
                     <tbody>
                         @forelse($machines as $machine)
@@ -90,8 +90,8 @@
                                         <div class="modal-body">
                                             <dl class="row mb-0">
                                                 <dt class="col-sm-4">Name</dt><dd class="col-sm-8">{{ $machine->name }}</dd>
-                                                <dt class="col-sm-4">Code</dt><dd class="col-sm-8">{{ $machine->code }}</dd>
-                                                <dt class="col-sm-4">Machine No</dt><dd class="col-sm-8">{{ $machine->machine_no ?? '—' }}</dd>
+                                                <dt class="col-sm-4">Machine No</dt><dd class="col-sm-8">{{ $machine->code }}</dd>
+                                                <dt class="col-sm-4">Serial No</dt><dd class="col-sm-8">{{ $machine->machine_no ?? '—' }}</dd>
                                                 <dt class="col-sm-4">Brand</dt><dd class="col-sm-8">{{ $machine->brand?->name ?? '—' }}</dd>
                                                 <dt class="col-sm-4">Model</dt><dd class="col-sm-8">{{ $machine->model ?? '—' }}</dd>
                                                 <dt class="col-sm-4">Origin</dt><dd class="col-sm-8">{{ $machine->origin ?? '—' }}</dd>
