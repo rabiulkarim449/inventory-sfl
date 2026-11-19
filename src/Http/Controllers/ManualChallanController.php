@@ -20,6 +20,9 @@ class ManualChallanController extends Controller
 {
     private const PERM = 'inv_manual_challan';
 
+    /** Key on the central Approvals page and on Settings > Mail Notifications. */
+    public const APPROVAL_MODULE = 'inventory.manual_challan';
+
     public function index(Request $request, string $type): View
     {
         $this->authorize(self::PERM . '.list');
@@ -85,6 +88,8 @@ class ManualChallanController extends Controller
             }
         }
 
+        $this->requestApproval($challan);
+
         return redirect()->route('inventory.manual-challans.show', [$type, $challan])
             ->with('success', "Challan {$challan->challan_no} submitted — waiting for approval.");
     }
@@ -138,8 +143,9 @@ class ManualChallanController extends Controller
         if (! $challan->isPending()) {
             return $this->locked($type, $challan);
         }
-        // Soft delete: the Challan No stays taken.
+        // Soft delete: the Challan No stays taken. Its request leaves the Approvals list.
         $challan->delete();
+        $this->centralApprovals($challan)?->delete();
 
         return redirect()->route('inventory.manual-challans.index', $type)->with('success', "Challan {$challan->challan_no} deleted.");
     }
@@ -178,9 +184,51 @@ class ManualChallanController extends Controller
             'approved_at' => now(),
             'approval_remarks' => $data['approval_remarks'] ?? null,
         ]);
+        // Decided here: close its request on the central Approvals page too. Updated
+        // directly, not through ApprovalService, as the challan is already settled.
+        $this->centralApprovals($challan)?->update([
+            'status' => $status,
+            'approved_by' => auth()->id(),
+            'approved_at' => now(),
+            'remarks' => $data['approval_remarks'] ?? null,
+        ]);
 
         return redirect()->route('inventory.manual-challans.show', [$type, $challan])
             ->with('success', "Challan {$challan->challan_no} " . ($status === 'approved' ? 'approved.' : 'rejected.'));
+    }
+
+    /**
+     * Puts the challan on the central Approvals page; that also emails the people picked on
+     * Settings > Mail Notifications > "Approval: Manual Challan". Without the host's approval
+     * system nothing happens and the challan is approved on its own page only.
+     */
+    private function requestApproval(ManualChallan $challan): void
+    {
+        if (! class_exists(\App\Services\ApprovalService::class)) {
+            return;
+        }
+        $info = $challan->typeInfo();
+        app(\App\Services\ApprovalService::class)->request([
+            'module' => self::APPROVAL_MODULE,
+            'approvable' => $challan,
+            'title' => "Manual Challan - {$challan->challan_no} ({$info['menu']})",
+            'description' => auth()->user()?->name . ' submitted a ' . $info['title'] . ' to ' . $challan->to_name
+                . ' — ' . inv_qty($challan->load('items')->totalQty()) . ' pcs.',
+            'route_name' => 'inventory.manual-challans.show',
+            'route_params' => ['type' => $challan->type, 'challan' => $challan->id],
+            'requested_by' => auth()->id(),
+        ]);
+    }
+
+    /** The challan's still-pending request on the central Approvals page (query), if that system exists. */
+    private function centralApprovals(ManualChallan $challan)
+    {
+        if (! class_exists(\App\Models\Approval::class)) {
+            return null;
+        }
+
+        return \App\Models\Approval::query()->where('module', self::APPROVAL_MODULE)
+            ->where('approvable_type', ManualChallan::class)->where('approvable_id', $challan->id)->where('status', 'pending');
     }
 
     private function find(string $type, int $id): ManualChallan
