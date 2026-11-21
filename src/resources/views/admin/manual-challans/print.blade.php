@@ -6,8 +6,8 @@
 <style>
     /* No page size here: the browser's print dialog then offers Layout (Portrait / Landscape) and Paper size. */
     @page { margin: 10mm; }
-    .mc-head { position: relative; text-align: center; margin-bottom: 4px; min-height: 60px; }
-    .mc-head .mc-logo { position: absolute; left: 0; top: 0; height: 60px; max-width: 170px; object-fit: contain; }
+    .mc-head { position: relative; text-align: center; margin-bottom: 4px; min-height: 85px; }
+    .mc-head .mc-logo { position: absolute; left: 0; top: 0; height: 85px; max-width: 240px; object-fit: contain; }
     .mc-head .mc-name { font-size: 22px; font-weight: 800; letter-spacing: .5px; }
     .mc-head .mc-addr { font-size: 11px; font-weight: 600; }
     .mc-title { text-align: center; font-size: 18px; font-weight: 800; margin: 8px 0 10px; }
