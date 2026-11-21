@@ -32,8 +32,9 @@
     .mc-sign .line { border-top: 1px solid #333; padding-top: 4px; font-weight: 600; }
     /* On paper the signatures sit at the foot of the page; the tfoot spacer (repeated on every page) keeps the table from running under them. */
     @media print {
-        .mc-sign { position: fixed; left: 0; right: 0; bottom: 0; margin: 0; }
-        .mc-sign-space { display: block; height: 90px; }
+        /* Raised off the page edge: the blank band below is left for seals / stamps. */
+        .mc-sign { position: fixed; left: 0; right: 0; bottom: 55mm; margin: 0; }
+        .mc-sign-space { display: block; height: calc(55mm + 90px); }
     }
 </style>
 @endpush
