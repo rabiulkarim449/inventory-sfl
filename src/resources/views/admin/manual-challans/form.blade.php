@@ -30,8 +30,10 @@
     .mc-lines th { white-space: nowrap; font-size: 12px; vertical-align: middle; text-align: center; }
     .mc-lines td { padding: 2px; vertical-align: middle; }
     .mc-lines input[type=text], .mc-lines input[type=number] { min-width: 60px; }
-    .mc-lines .mc-size input { min-width: 46px; width: 52px; text-align: right; }
-    .mc-lines .mc-qty input { width: 80px; text-align: right; }
+    /* Every box fills its whole column, whatever the header width. */
+    .mc-lines td > input { width: 100% !important; }
+    .mc-lines .mc-size input { min-width: 52px; text-align: right; }
+    .mc-lines .mc-qty input { min-width: 70px; text-align: right; }
     /* An unticked green column: grey, empty and not writable. */
     .mc-lines input[data-col][readonly] { background: #f1f5f9; cursor: not-allowed; }
     .mc-lines input[data-qty][readonly] { background: #f8fafc; }
