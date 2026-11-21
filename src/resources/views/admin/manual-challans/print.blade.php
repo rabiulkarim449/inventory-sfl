@@ -4,7 +4,8 @@
 
 @push('css')
 <style>
-    @page { size: A4 {{ count($challan->optional_columns ?? []) > 3 ? 'landscape' : 'portrait' }}; margin: 10mm; }
+    /* No page size here: the browser's print dialog then offers Layout (Portrait / Landscape) and Paper size. */
+    @page { margin: 10mm; }
     .mc-head { text-align: center; margin-bottom: 4px; }
     .mc-head .mc-name { font-size: 22px; font-weight: 800; letter-spacing: .5px; }
     .mc-head .mc-addr { font-size: 11px; font-weight: 600; }
@@ -58,16 +59,16 @@
 
 <div class="mc-sign">
     <div class="box">
+        <div class="slot"></div>
+        <div class="line">Receiver's Signature</div>
+    </div>
+    <div class="box">
         <div class="slot">@if($challan->creator?->signature)<img src="{{ asset($challan->creator->signature) }}" alt="Signature">@endif</div>
         <div class="line">Prepared By{{ $challan->creator ? ' — ' . $challan->creator->name : '' }}</div>
     </div>
     <div class="box">
         <div class="slot"></div>
         <div class="line">Checked By</div>
-    </div>
-    <div class="box">
-        <div class="slot"></div>
-        <div class="line">Receiver's Signature</div>
     </div>
     <div class="box">
         <div class="slot">@if($challan->isApproved() && $challan->approver?->signature)<img src="{{ asset($challan->approver->signature) }}" alt="Signature">@endif</div>
