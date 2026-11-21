@@ -11,7 +11,7 @@ class ManualChallanItem extends Model
 
     protected $fillable = [
         'manual_challan_id', 'sequence', 'description', 'po_no', 'style', 'item_code', 'color', 'size', 'sizes',
-        'buyer_sample_qty', 'sfl_sample_qty', 'qty', 'unit', 'hanger_carton', 'remarks',
+        'buyer_sample_qty', 'sfl_sample_qty', 'qty', 'unit', 'hanger', 'carton', 'remarks',
     ];
 
     protected $casts = ['sizes' => 'array'];

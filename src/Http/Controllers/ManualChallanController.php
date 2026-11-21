@@ -271,9 +271,11 @@ class ManualChallanController extends Controller
             'items.*.sfl_sample_qty' => ['nullable', 'numeric', 'min:0'],
             'items.*.qty' => ['nullable', 'numeric', 'min:0'],
             'items.*.unit' => ['nullable', 'string', 'max:30'],
-            'items.*.hanger_carton' => ['nullable', 'string', 'max:50'],
+            'items.*.hanger' => ['nullable', 'numeric', 'min:0'],
+            'items.*.carton' => ['nullable', 'numeric', 'min:0'],
             'items.*.remarks' => ['nullable', 'string', 'max:255'],
-        ], [], ['to_name' => 'To', 'challan_date' => 'Date']);
+        ], [], ['to_name' => 'To', 'challan_date' => 'Date', 'items.*.qty' => 'Qty', 'items.*.sizes.*' => 'Size qty',
+            'items.*.hanger' => 'Hanger', 'items.*.carton' => 'Carton', 'items.*.buyer_sample_qty' => 'Sample of Buyer', 'items.*.sfl_sample_qty' => 'PP Sample from SFL']);
 
         // Ticked green columns, kept in the type's own order; anything typed in an unticked one is dropped.
         $on = array_values(array_intersect($allowed, $data['optional_columns'] ?? []));
@@ -288,8 +290,10 @@ class ManualChallanController extends Controller
             if ($parts = ManualChallanTypes::get($type)['total_of'] ?? null) {
                 $line['qty'] = (float) collect($parts)->sum(fn ($p) => (float) ($line[$p] ?? 0));
             }
-            if (! in_array('hanger_carton', $on, true)) {
-                $line['hanger_carton'] = null;
+            foreach (['hanger', 'carton'] as $col) {
+                if (! in_array($col, $on, true)) {
+                    $line[$col] = null;
+                }
             }
 
             return $line;
@@ -320,7 +324,8 @@ class ManualChallanController extends Controller
                 'sfl_sample_qty' => $line['sfl_sample_qty'] ?? null,
                 'qty' => $line['qty'],
                 'unit' => ($line['unit'] ?? null) ?: 'PCS',
-                'hanger_carton' => $line['hanger_carton'] ?? null,
+                'hanger' => ($line['hanger'] ?? null) !== null && $line['hanger'] !== '' ? $line['hanger'] : null,
+                'carton' => ($line['carton'] ?? null) !== null && $line['carton'] !== '' ? $line['carton'] : null,
                 'remarks' => $line['remarks'] ?? null,
             ]);
         }

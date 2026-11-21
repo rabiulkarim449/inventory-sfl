@@ -14,7 +14,8 @@
                                 @endforeach
                                 <th>Total Qty</th>
                                 <th>Unit</th>
-                                <th class="mc-optional">{!! $greenHeader('hanger_carton', 'Hanger / Carton') !!}</th>
+                                <th class="mc-optional">{!! $greenHeader('hanger', 'Hanger') !!}</th>
+                                <th class="mc-optional">{!! $greenHeader('carton', 'Carton') !!}</th>
                                 <th>Remarks</th>
                                 <th style="width:36px"></th>
                             </tr>
@@ -31,7 +32,7 @@
                                     <td class="text-right" data-size-total="{{ $size }}"></td>
                                 @endforeach
                                 <td class="text-right" id="mcGrandTotal"></td>
-                                <td colspan="4"></td>
+                                <td colspan="5"></td>
                             </tr>
                         </tfoot>
                     </table>

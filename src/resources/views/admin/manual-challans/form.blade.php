@@ -4,7 +4,7 @@
     $editing = $challan->exists;
     // Ticked green columns (old input after a failed submit wins).
     $on = array_values(array_intersect(\ME\SflInventory\Support\ManualChallanTypes::optionalColumns($type), (array) old('optional_columns', $challan->optional_columns ?? [])));
-    $lines = old('items', $editing ? $challan->items->map(fn ($i) => $i->only(['description', 'po_no', 'style', 'item_code', 'color', 'size', 'sizes', 'buyer_sample_qty', 'sfl_sample_qty', 'qty', 'unit', 'hanger_carton', 'remarks']))->all() : []);
+    $lines = old('items', $editing ? $challan->items->map(fn ($i) => $i->only(['description', 'po_no', 'style', 'item_code', 'color', 'size', 'sizes', 'buyer_sample_qty', 'sfl_sample_qty', 'qty', 'unit', 'hanger', 'carton', 'remarks']))->all() : []);
     if (empty($lines)) {
         $lines = [[], []];
     }
@@ -35,6 +35,10 @@
     /* An unticked green column: grey, empty and not writable. */
     .mc-lines input[data-col][readonly] { background: #f1f5f9; cursor: not-allowed; }
     .mc-lines input[data-qty][readonly] { background: #f8fafc; }
+    /* Number boxes without the up / down arrows (digits only — see the script below). */
+    .mc-lines input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+    .mc-lines input[type=number]::-webkit-outer-spin-button,
+    .mc-lines input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 </style>
 @endpush
 
@@ -179,6 +183,18 @@
         recalc();
     });
     body.addEventListener('input', recalc);
+    // Number boxes take digits and one decimal point only: no e, +, - and no change on mouse wheel.
+    body.addEventListener('keydown', function (e) {
+        if (e.target.type === 'number' && ['e', 'E', '+', '-'].includes(e.key)) { e.preventDefault(); }
+    });
+    body.addEventListener('wheel', function (e) {
+        if (e.target.type === 'number' && document.activeElement === e.target) { e.target.blur(); }
+    }, { passive: true });
+    body.addEventListener('paste', function (e) {
+        if (e.target.type !== 'number') { return; }
+        const text = (e.clipboardData || window.clipboardData).getData('text').trim();
+        if (!/^\d*\.?\d*$/.test(text)) { e.preventDefault(); }
+    });
     document.querySelectorAll('[data-col-toggle]').forEach(function (box) {
         box.addEventListener('change', function () { applyColumn(box.dataset.colToggle); recalc(); });
     });

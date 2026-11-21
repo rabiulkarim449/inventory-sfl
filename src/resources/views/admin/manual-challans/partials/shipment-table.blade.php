@@ -2,8 +2,10 @@
      Shipment & Sizeset lines: only the green columns ticked on this challan appear. --}}
 @php
     $sizes = $challan->optionalSizes();
-    $hanger = $challan->optionalOn('hanger_carton');
-    $cols = 5 + count($sizes) + 2 + ($hanger ? 1 : 0) + 1;
+    $hanger = $challan->optionalOn('hanger');
+    $carton = $challan->optionalOn('carton');
+    $cols = 5 + count($sizes) + 2 + ($hanger ? 1 : 0) + ($carton ? 1 : 0) + 1;
+    $n = fn ($v) => $v !== null && (float) $v ? inv_qty($v) : '';
     $unit = $challan->items->pluck('unit')->filter()->unique();
 @endphp
 <table class="{{ $class ?? 'table table-bordered table-sm' }}">
@@ -17,7 +19,8 @@
             @foreach($sizes as $size)<th>{{ $size }}</th>@endforeach
             <th>TOTAL QTY.</th>
             <th>UNIT</th>
-            @if($hanger)<th>HANGER/<br>CARTON</th>@endif
+            @if($hanger)<th>HANGER</th>@endif
+            @if($carton)<th>CARTON</th>@endif
             <th>REMARKS</th>
         </tr>
     </thead>
@@ -32,7 +35,8 @@
                 @foreach($sizes as $size)<td>{{ $item->sizeQty($size) ? inv_qty($item->sizeQty($size)) : '' }}</td>@endforeach
                 <td>{{ inv_qty($item->qty) }}</td>
                 <td>{{ $item->unit }}</td>
-                @if($hanger)<td>{{ $item->hanger_carton }}</td>@endif
+                @if($hanger)<td>{{ $n($item->hanger) }}</td>@endif
+                @if($carton)<td>{{ $n($item->carton) }}</td>@endif
                 <td class="text-left">{{ $item->remarks }}</td>
             </tr>
         @endforeach
@@ -49,7 +53,8 @@
             @endforeach
             <td>{{ inv_qty($challan->totalQty()) }}</td>
             <td>{{ $unit->count() === 1 ? $unit->first() : '' }}</td>
-            @if($hanger)<td></td>@endif
+            @if($hanger)<td>{{ $n($challan->items->sum(fn ($i) => (float) $i->hanger)) }}</td>@endif
+            @if($carton)<td>{{ $n($challan->items->sum(fn ($i) => (float) $i->carton)) }}</td>@endif
             <td></td>
         </tr>
     </tfoot>

@@ -18,8 +18,8 @@ class ManualChallanTypes
         'shipment' => [
             'title' => 'Delivery Challan for Shipment & Sizeset',
             'menu' => 'Shipment & Sizeset',
-            // Green columns: each size and Hanger / Carton, ticked one by one on the form.
-            'optional' => [...self::SIZES, 'hanger_carton'],
+            // Green columns: each size, Hanger and Carton, ticked one by one on the form.
+            'optional' => [...self::SIZES, 'hanger', 'carton'],
             'sizes' => self::SIZES,
         ],
         'inventory_return' => [
