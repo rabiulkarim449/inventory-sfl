@@ -168,6 +168,12 @@ Route::middleware($route['middleware'] ?? ['web', 'auth'])
                 Route::post('{challan}/reject', 'reject')->whereNumber('challan')->name('reject');
             });
 
+        // Style Closing Summary — in the Manual Challan menu, typed by hand.
+        Route::resource('closing-summaries', \ME\SflInventory\Http\Controllers\ClosingSummaryController::class)
+            ->parameters(['closing-summaries' => 'closingSummary']);
+        Route::get('closing-summaries/{closingSummary}/print', [\ME\SflInventory\Http\Controllers\ClosingSummaryController::class, 'print'])
+            ->name('closing-summaries.print');
+
         // Internal Stock Transfer + Production Consumption
         Route::resource('transfers', InvStockTransferController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy']);
         Route::post('transfers/{transfer}/approve', [InvStockTransferController::class, 'approve'])->name('transfers.approve');
