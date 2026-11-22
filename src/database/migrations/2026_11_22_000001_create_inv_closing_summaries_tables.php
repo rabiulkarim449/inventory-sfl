@@ -15,7 +15,9 @@ return new class extends Migration
     {
         Schema::create('inv_closing_summaries', function (Blueprint $table) {
             $table->id();
-            $table->date('report_date');
+            $table->date('report_date');                 // set by the system on save
+            $table->string('factory_name')->nullable();  // typed; the form starts with the company's own
+            $table->string('factory_location')->nullable();
             $table->string('po_no', 100)->nullable();
             $table->string('logo')->nullable();          // path on the "public" disk
             $table->text('comments')->nullable();

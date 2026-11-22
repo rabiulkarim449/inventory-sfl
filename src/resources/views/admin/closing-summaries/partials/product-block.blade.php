@@ -8,7 +8,7 @@
     <div class="p-2">
         <div class="row">
             <div class="col-lg-3 mb-2">
-                <label class="small mb-1">Product <span class="text-muted">(name, style, PO)</span></label>
+                <label class="small mb-1">Product Code <span class="text-muted">(name, style, PO)</span></label>
                 <textarea name="{{ $n }}[product]" rows="4" class="form-control form-control-sm" maxlength="1000" placeholder="Platinum Waistcoat&#10;Style: KX-SFL-16-26&#10;PO: 267544">{{ $p['product'] ?? '' }}</textarea>
             </div>
             <div class="col-lg-9">
@@ -22,7 +22,7 @@
                         <input type="number" step="any" min="0" name="{{ $n }}[ship_qty]" class="form-control form-control-sm text-right" value="{{ $p['ship_qty'] ?? '' }}" data-ship>
                     </div>
                     <div class="col-4 col-md-2 mb-2">
-                        <label class="small mb-1">Short/Exc</label>
+                        <label class="small mb-1">Short/Excess</label>
                         <input type="text" class="form-control form-control-sm text-right cs-auto" readonly tabindex="-1" data-short>
                     </div>
                     <div class="col-md-6 mb-2">

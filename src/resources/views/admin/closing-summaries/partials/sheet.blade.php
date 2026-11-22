@@ -17,14 +17,14 @@
             <td colspan="3" rowspan="4" class="cs-logo">@if($logo)<img src="{{ $logo }}" alt="Logo">@endif</td>
             <td colspan="2" rowspan="4" class="cs-blank"></td>
             <td colspan="2" class="cs-lbl">Factory Name :</td>
-            <td class="cs-val">{{ config('sfl-inventory.company.name') }}</td>
+            <td class="cs-val">{{ $summary->factory_name }}</td>
         </tr>
         <tr>
             <td colspan="2" class="cs-lbl">Factory Location :</td>
-            <td class="cs-val">{{ config('sfl-inventory.company.address') }}</td>
+            <td class="cs-val">{{ $summary->factory_location }}</td>
         </tr>
         <tr>
-            <td colspan="2" class="cs-lbl">PO No :</td>
+            <td colspan="2" class="cs-lbl">Purchase Order No (PO) :</td>
             <td class="cs-val">{{ $summary->po_no }}</td>
         </tr>
         <tr>
@@ -36,10 +36,10 @@
         @foreach($summary->products as $p)
             @php $se = $p->shortExcess(); @endphp
             <tr class="cs-head">
-                <td>Product</td>
+                <td>Product Code:</td>
                 <td>BOM Qty:</td><td class="cs-num">{{ $qty($p->bom_qty) }}</td>
                 <td>Ship Qty:</td><td class="cs-num">{{ $qty($p->ship_qty) }}</td>
-                <td>Short/Exc</td><td class="cs-num">{{ $se === null ? '' : ($se > 0 ? '+' : '') . $qty($se) }}</td>
+                <td>Short/Excess</td><td class="cs-num">{{ $se === null ? '' : ($se > 0 ? '+' : '') . $qty($se) }}</td>
                 <td>Remarks</td>
             </tr>
             <tr>

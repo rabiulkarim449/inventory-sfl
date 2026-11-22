@@ -79,20 +79,23 @@
                     </div>
                     <div class="col-lg-5 offset-lg-1">
                         <div class="form-group row mb-2">
-                            <label class="col-sm-4 col-form-label col-form-label-sm">Factory Name</label>
-                            <div class="col-sm-8"><input type="text" class="form-control form-control-sm cs-auto" value="{{ config('sfl-inventory.company.name') }}" readonly tabindex="-1"></div>
+                            <label class="col-sm-5 col-form-label col-form-label-sm">Factory Name</label>
+                            <div class="col-sm-7"><input type="text" name="factory_name" class="form-control form-control-sm" maxlength="255" value="{{ old('factory_name', $summary->factory_name) }}"></div>
                         </div>
                         <div class="form-group row mb-2">
-                            <label class="col-sm-4 col-form-label col-form-label-sm">Factory Location</label>
-                            <div class="col-sm-8"><input type="text" class="form-control form-control-sm cs-auto" value="{{ config('sfl-inventory.company.address') }}" readonly tabindex="-1"></div>
+                            <label class="col-sm-5 col-form-label col-form-label-sm">Factory Location</label>
+                            <div class="col-sm-7"><input type="text" name="factory_location" class="form-control form-control-sm" maxlength="255" value="{{ old('factory_location', $summary->factory_location) }}"></div>
                         </div>
                         <div class="form-group row mb-2">
-                            <label class="col-sm-4 col-form-label col-form-label-sm">PO No</label>
-                            <div class="col-sm-8"><input type="text" name="po_no" class="form-control form-control-sm" maxlength="100" value="{{ old('po_no', $summary->po_no) }}"></div>
+                            <label class="col-sm-5 col-form-label col-form-label-sm">Purchase Order No (PO)</label>
+                            <div class="col-sm-7"><input type="text" name="po_no" class="form-control form-control-sm" maxlength="100" value="{{ old('po_no', $summary->po_no) }}"></div>
                         </div>
                         <div class="form-group row mb-2">
-                            <label class="col-sm-4 col-form-label col-form-label-sm">Report Date <span class="text-danger">*</span></label>
-                            <div class="col-sm-8"><input type="date" name="report_date" class="form-control form-control-sm" value="{{ old('report_date', $summary->report_date?->format('Y-m-d')) }}" required></div>
+                            <label class="col-sm-5 col-form-label col-form-label-sm">Report Date</label>
+                            <div class="col-sm-7">
+                                {{-- Set by the system: the day the summary is first saved. --}}
+                                <input type="text" class="form-control form-control-sm cs-auto" value="{{ ($summary->report_date ?? today())->format('d M Y') }}" readonly tabindex="-1">
+                            </div>
                         </div>
                     </div>
                 </div>

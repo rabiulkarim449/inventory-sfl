@@ -41,7 +41,11 @@ class ClosingSummaryController extends Controller
         $this->authorize(self::PERM . '.add');
 
         return view('sfl-inventory::admin.closing-summaries.form', [
-            'summary' => new ClosingSummary(['report_date' => today()]),
+            'summary' => new ClosingSummary([
+                'report_date' => today(),
+                'factory_name' => config('sfl-inventory.company.name'),
+                'factory_location' => config('sfl-inventory.company.address'),
+            ]),
             'earlierLogos' => ClosingSummary::earlierLogos(),
         ]);
     }
@@ -53,7 +57,10 @@ class ClosingSummaryController extends Controller
 
         $summary = DB::transaction(function () use ($data, $request) {
             $summary = ClosingSummary::create([
-                'report_date' => $data['report_date'],
+                // Report Date is the system's (red on the client's sheet): the day it is saved.
+                'report_date' => today()->toDateString(),
+                'factory_name' => $data['factory_name'] ?? null,
+                'factory_location' => $data['factory_location'] ?? null,
                 'po_no' => $data['po_no'] ?? null,
                 'logo' => $this->logoPath($request, null),
                 'comments' => $data['comments'] ?? null,
@@ -90,8 +97,10 @@ class ClosingSummaryController extends Controller
         $data = $this->validated($request);
 
         DB::transaction(function () use ($closingSummary, $data, $request) {
+            // Report Date stays as first saved.
             $closingSummary->update([
-                'report_date' => $data['report_date'],
+                'factory_name' => $data['factory_name'] ?? null,
+                'factory_location' => $data['factory_location'] ?? null,
                 'po_no' => $data['po_no'] ?? null,
                 'logo' => $this->logoPath($request, $closingSummary->logo),
                 'comments' => $data['comments'] ?? null,
@@ -142,7 +151,8 @@ class ClosingSummaryController extends Controller
     private function validated(Request $request): array
     {
         $data = $request->validate([
-            'report_date' => ['required', 'date'],
+            'factory_name' => ['nullable', 'string', 'max:255'],
+            'factory_location' => ['nullable', 'string', 'max:255'],
             'po_no' => ['nullable', 'string', 'max:100'],
             'comments' => ['nullable', 'string', 'max:5000'],
             'logo_file' => ['nullable', 'file', 'mimes:jpg,jpeg,png', 'max:2048'],
@@ -155,7 +165,7 @@ class ClosingSummaryController extends Controller
             'products.*.trims' => ['nullable', 'array'],
             'products.*.trims.*' => ['nullable', 'string', 'max:50'],
         ], [], [
-            'report_date' => 'Report Date', 'logo_file' => 'Logo', 'products.*.product' => 'Product',
+            'po_no' => 'Purchase Order No (PO)', 'logo_file' => 'Logo', 'products.*.product' => 'Product',
             'products.*.bom_qty' => 'BOM Qty', 'products.*.ship_qty' => 'Ship Qty', 'products.*.trims.*' => 'Trims value',
         ]);
 

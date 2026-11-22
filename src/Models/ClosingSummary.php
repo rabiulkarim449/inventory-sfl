@@ -21,7 +21,7 @@ class ClosingSummary extends Model
 
     protected $table = 'inv_closing_summaries';
 
-    protected $fillable = ['report_date', 'po_no', 'logo', 'comments', 'created_by'];
+    protected $fillable = ['report_date', 'factory_name', 'factory_location', 'po_no', 'logo', 'comments', 'created_by'];
 
     protected $casts = ['report_date' => 'date'];
 
