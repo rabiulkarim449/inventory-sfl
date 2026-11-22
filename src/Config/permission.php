@@ -102,7 +102,7 @@ return [
             'permissions' => $crud + ['print' => 'Print'],
         ],
         'inv_manual_challan' => [
-            'label' => 'Manual Delivery Challan (all 4 types)',
+            'label' => 'Manual Challan (all types + Closing Summary)',
             'permissions' => $crud + ['approve' => 'Approve / Reject', 'print' => 'Print'],
         ],
         'inv_transfer' => [
