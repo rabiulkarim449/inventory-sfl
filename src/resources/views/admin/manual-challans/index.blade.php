@@ -1,5 +1,7 @@
 @extends(adminTheme() . 'layouts.app')
 
+@php $perm = \ME\SflInventory\Support\ManualChallanTypes::permission($type); @endphp
+
 @section('title')
     <title>{{ websiteTitle($info['title']) }}</title>
 @endsection
@@ -12,7 +14,7 @@
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h4 class="mb-0">{{ $info['title'] }}</h4>
-            @can('inv_manual_challan.add')
+            @can($perm . '.add')
                 <a href="{{ route('inventory.manual-challans.create', $type) }}" class="btn btn-sm ui-act ui-act-create" title="New Challan"><i class="fa-solid fa-plus"></i> New Challan</a>
             @endcan
         </div>
@@ -59,17 +61,17 @@
                                 <td><span class="badge badge-{{ $statusColor }}">{{ $statusLabel }}</span></td>
                                 <td>{{ $challan->creator->name ?? '' }}</td>
                                 <td class="text-right text-nowrap">
-                                    @can('inv_manual_challan.view')
+                                    @can($perm . '.view')
                                         <a href="{{ route('inventory.manual-challans.show', [$type, $challan]) }}" class="btn-custom ui-act ui-act-view" title="View"><i class="fa-solid fa-eye"></i></a>
                                     @endcan
-                                    @can('inv_manual_challan.print')
+                                    @can($perm . '.print')
                                         <a href="{{ route('inventory.manual-challans.print', [$type, $challan]) }}" target="_blank" class="btn-custom ui-act ui-act-print" title="Print"><i class="fa-solid fa-print"></i></a>
                                     @endcan
                                     @if($challan->isPending())
-                                        @can('inv_manual_challan.edit')
+                                        @can($perm . '.edit')
                                             <a href="{{ route('inventory.manual-challans.edit', [$type, $challan]) }}" class="btn-custom ui-act ui-act-edit" title="Edit"><i class="fa-solid fa-pen-to-square"></i></a>
                                         @endcan
-                                        @can('inv_manual_challan.delete')
+                                        @can($perm . '.delete')
                                             <button type="button" class="btn-custom ui-act ui-act-delete" data-toggle="modal" data-target="#deleteManualChallanModal" data-action="{{ route('inventory.manual-challans.destroy', [$type, $challan]) }}" title="Delete"><i class="fa-solid fa-trash"></i></button>
                                         @endcan
                                     @endif

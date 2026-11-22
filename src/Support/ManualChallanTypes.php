@@ -38,6 +38,12 @@ class ManualChallanTypes
         ],
     ];
 
+    /** The type's own permission row on the Role page, e.g. inv_mc_shipment (.list, .add, .approve …). */
+    public static function permission(string $type): string
+    {
+        return 'inv_mc_' . $type;
+    }
+
     /** Green columns a type allows (empty for a type without any). */
     public static function optionalColumns(string $type): array
     {

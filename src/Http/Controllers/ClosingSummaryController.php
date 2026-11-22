@@ -13,11 +13,11 @@ use ME\SflInventory\Support\ClosingSummaryTrims;
 
 /**
  * Style Closing Summary (Manual Challan section). Typed by hand: no number and
- * no approval, so it can be edited any time. Uses the Manual Challan permissions.
+ * no approval, so it can be edited any time. Own permission row: Closing Summary.
  */
 class ClosingSummaryController extends Controller
 {
-    private const PERM = 'inv_manual_challan';
+    private const PERM = 'inv_closing_summary';
 
     public function index(Request $request): View
     {

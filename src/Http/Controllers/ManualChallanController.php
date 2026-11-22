@@ -18,14 +18,18 @@ use ME\SflInventory\Support\ManualChallanTypes;
  */
 class ManualChallanController extends Controller
 {
-    private const PERM = 'inv_manual_challan';
+    /** The type's own permission row, e.g. inv_mc_shipment. */
+    private function perm(string $type): string
+    {
+        return ManualChallanTypes::permission($type);
+    }
 
     /** Key on the central Approvals page and on Settings > Mail Notifications. */
     public const APPROVAL_MODULE = 'inventory.manual_challan';
 
     public function index(Request $request, string $type): View
     {
-        $this->authorize(self::PERM . '.list');
+        $this->authorize($this->perm($type) . '.list');
 
         $challans = ManualChallan::query()->where('type', $type)
             ->with(['items:id,manual_challan_id,qty', 'creator:id,name'])
@@ -47,7 +51,7 @@ class ManualChallanController extends Controller
 
     public function create(string $type): View
     {
-        $this->authorize(self::PERM . '.add');
+        $this->authorize($this->perm($type) . '.add');
 
         $challan = new ManualChallan(['type' => $type, 'challan_date' => today(), 'optional_columns' => []]);
 
@@ -56,7 +60,7 @@ class ManualChallanController extends Controller
 
     public function store(Request $request, string $type): RedirectResponse
     {
-        $this->authorize(self::PERM . '.add');
+        $this->authorize($this->perm($type) . '.add');
         $data = $this->validated($request, $type, true);
         $date = Carbon::parse($data['challan_date']);
 
@@ -96,7 +100,7 @@ class ManualChallanController extends Controller
 
     public function show(string $type, int $challan): View
     {
-        $this->authorize(self::PERM . '.view');
+        $this->authorize($this->perm($type) . '.view');
         $challan = $this->find($type, $challan)->load(['items', 'creator', 'approver']);
 
         return view('sfl-inventory::admin.manual-challans.show', ['type' => $type, 'info' => ManualChallanTypes::get($type), 'challan' => $challan]);
@@ -104,7 +108,7 @@ class ManualChallanController extends Controller
 
     public function edit(string $type, int $challan): View|RedirectResponse
     {
-        $this->authorize(self::PERM . '.edit');
+        $this->authorize($this->perm($type) . '.edit');
         $challan = $this->find($type, $challan)->load('items');
         if (! $challan->isPending()) {
             return $this->locked($type, $challan);
@@ -115,7 +119,7 @@ class ManualChallanController extends Controller
 
     public function update(Request $request, string $type, int $challan): RedirectResponse
     {
-        $this->authorize(self::PERM . '.edit');
+        $this->authorize($this->perm($type) . '.edit');
         $challan = $this->find($type, $challan);
         if (! $challan->isPending()) {
             return $this->locked($type, $challan);
@@ -138,7 +142,7 @@ class ManualChallanController extends Controller
 
     public function destroy(string $type, int $challan): RedirectResponse
     {
-        $this->authorize(self::PERM . '.delete');
+        $this->authorize($this->perm($type) . '.delete');
         $challan = $this->find($type, $challan);
         if (! $challan->isPending()) {
             return $this->locked($type, $challan);
@@ -163,7 +167,7 @@ class ManualChallanController extends Controller
     /** The printed challan — any status; the Approved By signature appears once approved. */
     public function print(string $type, int $challan): View
     {
-        $this->authorize(self::PERM . '.print');
+        $this->authorize($this->perm($type) . '.print');
         $challan = $this->find($type, $challan)->load(['items', 'creator', 'approver']);
 
         // A delivery challan is signed, so the layout's "no signature required" note is left off.
@@ -172,7 +176,7 @@ class ManualChallanController extends Controller
 
     private function decide(Request $request, string $type, int $id, string $status): RedirectResponse
     {
-        $this->authorize(self::PERM . '.approve');
+        $this->authorize($this->perm($type) . '.approve');
         $data = $request->validate(['approval_remarks' => ['nullable', 'string', 'max:255']]);
         $challan = $this->find($type, $id);
         if (! $challan->isPending()) {

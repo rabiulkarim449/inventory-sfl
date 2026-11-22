@@ -126,11 +126,11 @@ return [
                     'permission' => '',
                     'children'   => [
                         ...array_values(array_map(
-                            fn ($key, $t) => ['title' => $t['menu'], 'icon' => 'fa-solid fa-file-lines', 'icon_color' => 'text-primary', 'permission' => 'inv_manual_challan', 'route' => "$base/manual-challans/$key"],
+                            fn ($key, $t) => ['title' => $t['menu'], 'icon' => 'fa-solid fa-file-lines', 'icon_color' => 'text-primary', 'permission' => \ME\SflInventory\Support\ManualChallanTypes::permission($key), 'route' => "$base/manual-challans/$key"],
                             array_keys(\ME\SflInventory\Support\ManualChallanTypes::all()),
                             \ME\SflInventory\Support\ManualChallanTypes::all()
                         )),
-                        ['title' => 'Closing Summary', 'icon' => 'fa-solid fa-clipboard-check', 'icon_color' => 'text-primary', 'permission' => 'inv_manual_challan', 'route' => "$base/closing-summaries"],
+                        ['title' => 'Closing Summary', 'icon' => 'fa-solid fa-clipboard-check', 'icon_color' => 'text-primary', 'permission' => 'inv_closing_summary', 'route' => "$base/closing-summaries"],
                     ],
                 ],
                 [

@@ -12,7 +12,7 @@
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h4 class="mb-0">Style Closing Summary</h4>
-            @can('inv_manual_challan.add')
+            @can('inv_closing_summary.add')
                 <a href="{{ route('inventory.closing-summaries.create') }}" class="btn btn-sm ui-act ui-act-create" title="New Summary"><i class="fa-solid fa-plus"></i> New Summary</a>
             @endcan
         </div>
@@ -55,16 +55,16 @@
                                 <td class="text-right {{ $ship - $bom < 0 ? 'text-danger' : '' }}">{{ ($ship - $bom > 0 ? '+' : '') . inv_qty($ship - $bom) }}</td>
                                 <td>{{ $summary->creator->name ?? '' }}</td>
                                 <td class="text-right text-nowrap">
-                                    @can('inv_manual_challan.view')
+                                    @can('inv_closing_summary.view')
                                         <a href="{{ route('inventory.closing-summaries.show', $summary) }}" class="btn-custom ui-act ui-act-view" title="View"><i class="fa-solid fa-eye"></i></a>
                                     @endcan
-                                    @can('inv_manual_challan.print')
+                                    @can('inv_closing_summary.print')
                                         <a href="{{ route('inventory.closing-summaries.print', $summary) }}" target="_blank" class="btn-custom ui-act ui-act-print" title="Print"><i class="fa-solid fa-print"></i></a>
                                     @endcan
-                                    @can('inv_manual_challan.edit')
+                                    @can('inv_closing_summary.edit')
                                         <a href="{{ route('inventory.closing-summaries.edit', $summary) }}" class="btn-custom ui-act ui-act-edit" title="Edit"><i class="fa-solid fa-pen-to-square"></i></a>
                                     @endcan
-                                    @can('inv_manual_challan.delete')
+                                    @can('inv_closing_summary.delete')
                                         <button type="button" class="btn-custom ui-act ui-act-delete" data-toggle="modal" data-target="#deleteClosingSummaryModal" data-action="{{ route('inventory.closing-summaries.destroy', $summary) }}" title="Delete"><i class="fa-solid fa-trash"></i></button>
                                     @endcan
                                 </td>

@@ -1,5 +1,7 @@
 @extends(adminTheme() . 'layouts.app')
 
+@php $perm = \ME\SflInventory\Support\ManualChallanTypes::permission($type); @endphp
+
 @php [$statusLabel, $statusColor] = \ME\SflInventory\Models\ManualChallan::STATUSES[$challan->status] ?? [$challan->status, 'secondary']; @endphp
 
 @section('title')
@@ -15,11 +17,11 @@
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-1">
             <h4 class="mb-0">{{ $info['title'] }} <span class="badge badge-{{ $statusColor }} align-middle">{{ $statusLabel }}</span></h4>
             <div class="d-flex gap-1 flex-wrap">
-                @can('inv_manual_challan.print')
+                @can($perm . '.print')
                     <a href="{{ route('inventory.manual-challans.print', [$type, $challan]) }}" target="_blank" class="btn btn-sm ui-act ui-act-print" title="Print"><i class="fa-solid fa-print"></i> Print</a>
                 @endcan
                 @if($challan->isPending())
-                    @can('inv_manual_challan.edit')
+                    @can($perm . '.edit')
                         <a href="{{ route('inventory.manual-challans.edit', [$type, $challan]) }}" class="btn btn-sm ui-act ui-act-edit" title="Edit"><i class="fa-solid fa-pen-to-square"></i> Edit</a>
                     @endcan
                 @endif
@@ -47,7 +49,7 @@
             </div>
 
             @if($challan->isPending())
-                @can('inv_manual_challan.approve')
+                @can($perm . '.approve')
                     <div class="border rounded p-3 mt-3">
                         <h6 class="mb-2">Approval</h6>
                         <form method="POST" class="row align-items-end">

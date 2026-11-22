@@ -7,13 +7,14 @@ use App\Models\Approval;
 use Illuminate\Database\Eloquent\Model;
 use ME\SflInventory\Approvals\Concerns\ResolvesConfiguredRecipients;
 use ME\SflInventory\Models\ManualChallan;
+use ME\SflInventory\Support\ManualChallanTypes;
 
 /**
  * Registered in erp-suhana's config/approval.php under 'inventory.manual_challan'.
  *
  * Who is emailed when a Manual Challan is submitted: the users picked on
  * Settings > Mail Notifications > "Approval: Manual Challan"; with nobody
- * picked, every user whose role has Manual Challan "Approve / Reject".
+ * picked, every user whose role has "Approve / Reject" on that challan's type row.
  *
  * Approving / rejecting on the central Approvals page settles the challan;
  * the challan's own page does the same and closes this request (see
@@ -25,7 +26,10 @@ class ManualChallanApprovalHandler extends BaseApprovalHandler
 
     public function recipients(?Model $approvable, Approval $approval): array
     {
-        return $this->resolveRecipients('inventory.manual_challan', 'inv_manual_challan.approve');
+        // Nobody picked in Settings: whoever may approve this challan's type.
+        $type = $approvable instanceof ManualChallan ? $approvable->type : 'shipment';
+
+        return $this->resolveRecipients('inventory.manual_challan', ManualChallanTypes::permission($type) . '.approve');
     }
 
     public function onApproved(Approval $approval): void

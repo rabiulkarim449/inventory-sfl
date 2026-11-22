@@ -17,10 +17,10 @@
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-1">
             <h4 class="mb-0">Style Closing Summary</h4>
             <div class="d-flex gap-1 flex-wrap">
-                @can('inv_manual_challan.print')
+                @can('inv_closing_summary.print')
                     <a href="{{ route('inventory.closing-summaries.print', $summary) }}" target="_blank" class="btn btn-sm ui-act ui-act-print" title="Print"><i class="fa-solid fa-print"></i> Print</a>
                 @endcan
-                @can('inv_manual_challan.edit')
+                @can('inv_closing_summary.edit')
                     <a href="{{ route('inventory.closing-summaries.edit', $summary) }}" class="btn btn-sm ui-act ui-act-edit" title="Edit"><i class="fa-solid fa-pen-to-square"></i> Edit</a>
                 @endcan
                 <a href="{{ route('inventory.closing-summaries.index') }}" class="btn btn-sm ui-act ui-act-back" title="Back"><i class="fa-solid fa-arrow-left"></i> Back</a>

@@ -101,9 +101,14 @@ return [
             'label' => 'Sample Delivery Challan',
             'permissions' => $crud + ['print' => 'Print'],
         ],
-        'inv_manual_challan' => [
-            'label' => 'Manual Challan (all types + Closing Summary)',
-            'permissions' => $crud + ['approve' => 'Approve / Reject', 'print' => 'Print'],
+        // Manual Challan: one row per type (see ManualChallanTypes), then Closing Summary.
+        ...array_combine(
+            array_map([\ME\SflInventory\Support\ManualChallanTypes::class, 'permission'], array_keys(\ME\SflInventory\Support\ManualChallanTypes::all())),
+            array_map(fn ($t) => ['label' => $t['menu'] . ' Challan', 'permissions' => $crud + ['approve' => 'Approve / Reject', 'print' => 'Print']], array_values(\ME\SflInventory\Support\ManualChallanTypes::all()))
+        ),
+        'inv_closing_summary' => [
+            'label' => 'Closing Summary',
+            'permissions' => $crud + ['print' => 'Print'],
         ],
         'inv_transfer' => [
             'label' => 'Internal Stock Transfer',
