@@ -29,7 +29,7 @@ class ManualChallan extends Model
     protected $table = 'inv_manual_challans';
 
     protected $fillable = [
-        'type', 'challan_no', 'challan_date', 'to_name', 'to_address', 'to_contact', 'optional_columns',
+        'type', 'challan_no', 'challan_date', 'to_name', 'to_address', 'to_contact', 'vehicle_no', 'receiver_name', 'receiver_contact', 'optional_columns',
         'status', 'approved_by', 'approved_at', 'approval_remarks', 'created_by',
     ];
 

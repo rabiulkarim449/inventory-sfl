@@ -96,11 +96,29 @@
                                 @endif
                             </div>
                         </div>
+                        <div class="form-group row mb-2">
+                            <label class="col-sm-4 col-form-label col-form-label-sm">Vehicle No</label>
+                            <div class="col-sm-8"><input type="text" name="vehicle_no" class="form-control form-control-sm" value="{{ old('vehicle_no', $challan->vehicle_no) }}" maxlength="100"></div>
+                        </div>
                     </div>
                 </div>
 
                 @include('sfl-inventory::admin.manual-challans.partials.' . $type . '-form-table')
                 <button type="button" class="btn btn-sm ui-act ui-act-create" id="mcAddRow" title="Add Line"><i class="fa-solid fa-plus"></i> Add Line</button>
+
+                {{-- Printed under the Receiver's Signature; left blank, the receiver writes them by hand. --}}
+                <div class="row mt-3">
+                    <div class="col-lg-7">
+                        <div class="form-group row mb-2">
+                            <label class="col-sm-3 col-form-label col-form-label-sm">Receiver Name</label>
+                            <div class="col-sm-9"><input type="text" name="receiver_name" class="form-control form-control-sm" value="{{ old('receiver_name', $challan->receiver_name) }}" maxlength="255"></div>
+                        </div>
+                        <div class="form-group row mb-2">
+                            <label class="col-sm-3 col-form-label col-form-label-sm">Receiver Contact</label>
+                            <div class="col-sm-9"><input type="text" name="receiver_contact" class="form-control form-control-sm" value="{{ old('receiver_contact', $challan->receiver_contact) }}" maxlength="100"></div>
+                        </div>
+                    </div>
+                </div>
 
                 <div class="mt-3">
                     <button type="submit" class="btn btn-sm ui-act ui-act-save" title="{{ $editing ? 'Update' : 'Submit' }}"><i class="fa-solid fa-floppy-disk"></i> {{ $editing ? 'Update' : 'Submit for Approval' }}</button>

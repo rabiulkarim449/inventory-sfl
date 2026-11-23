@@ -34,7 +34,10 @@
                 <dt class="col-sm-2">Date</dt><dd class="col-sm-4">{{ $challan->challan_date->format('d M Y') }}</dd>
                 <dt class="col-sm-2">To</dt><dd class="col-sm-4">{{ $challan->to_name }}</dd>
                 <dt class="col-sm-2">Contact No</dt><dd class="col-sm-4">{{ $challan->to_contact ?: '—' }}</dd>
-                <dt class="col-sm-2">Address</dt><dd class="col-sm-10">{{ $challan->to_address ?: '—' }}</dd>
+                <dt class="col-sm-2">Address</dt><dd class="col-sm-4">{{ $challan->to_address ?: '—' }}</dd>
+                <dt class="col-sm-2">Vehicle No</dt><dd class="col-sm-4">{{ $challan->vehicle_no ?: '—' }}</dd>
+                <dt class="col-sm-2">Receiver Name</dt><dd class="col-sm-4">{{ $challan->receiver_name ?: '—' }}</dd>
+                <dt class="col-sm-2">Receiver Contact</dt><dd class="col-sm-4">{{ $challan->receiver_contact ?: '—' }}</dd>
                 <dt class="col-sm-2">Prepared By</dt><dd class="col-sm-4">{{ $challan->creator->name ?? '—' }} <span class="text-muted small">{{ $challan->created_at?->format('d M Y h:i A') }}</span></dd>
                 @unless($challan->isPending())
                     <dt class="col-sm-2">{{ $challan->isApproved() ? 'Approved By' : 'Rejected By' }}</dt>

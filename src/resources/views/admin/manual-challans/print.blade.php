@@ -30,11 +30,17 @@
     .mc-sign .slot { height: 50px; display: flex; align-items: flex-end; justify-content: center; }
     .mc-sign .slot img { max-height: 48px; max-width: 100%; }
     .mc-sign .line { border-top: 1px solid #333; padding-top: 4px; font-weight: 600; }
+    /* Receiver Name / Contact under the receiver's signature; blank = a line to write on. */
+    .mc-sign .info { text-align: left; margin-top: 6px; font-size: 11px; }
+    .mc-sign .info div { display: flex; margin-top: 4px; }
+    .mc-sign .info .k { flex-shrink: 0; font-weight: 600; margin-right: 4px; }
+    .mc-sign .info .v { flex: 1; border-bottom: 1px dotted #555; min-height: 14px; }
+    .mc-blank { display: inline-block; min-width: 90px; border-bottom: 1px dotted #555; }
     /* On paper the signatures sit at the foot of the page; the tfoot spacer (repeated on every page) keeps the table from running under them. */
     @media print {
         /* Raised off the page edge: the blank band below is left for seals / stamps. */
         .mc-sign { position: fixed; left: 0; right: 0; bottom: 55mm; margin: 0; }
-        .mc-sign-space { display: block; height: calc(55mm + 90px); }
+        .mc-sign-space { display: block; height: calc(55mm + 135px); }
     }
 </style>
 @endpush
@@ -57,6 +63,7 @@
     </div>
     <div class="text-right">
         <div><strong>Date:</strong> {{ $challan->challan_date->format('d.m.y') }}</div>
+        <div style="margin-top: 3px;"><strong>Vehicle No:</strong> @if($challan->vehicle_no){{ $challan->vehicle_no }}@else<span class="mc-blank">&nbsp;</span>@endif</div>
         @unless($challan->isApproved())
             <div class="mc-status">{{ strtoupper(\ME\SflInventory\Models\ManualChallan::STATUSES[$challan->status][0] ?? $challan->status) }}{{ $challan->isPending() ? ' APPROVAL' : '' }}</div>
         @endunless
@@ -75,6 +82,10 @@
     <div class="box">
         <div class="slot"></div>
         <div class="line">Receiver's Signature</div>
+        <div class="info">
+            <div><span class="k">Receiver Name:</span><span class="v">{{ $challan->receiver_name }}</span></div>
+            <div><span class="k">Receiver Contact:</span><span class="v">{{ $challan->receiver_contact }}</span></div>
+        </div>
     </div>
     <div class="box">
         <div class="slot"></div>
