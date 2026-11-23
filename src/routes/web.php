@@ -166,6 +166,7 @@ Route::middleware($route['middleware'] ?? ['web', 'auth'])
                 Route::get('{challan}/print', 'print')->whereNumber('challan')->name('print');
                 Route::post('{challan}/approve', 'approve')->whereNumber('challan')->name('approve');
                 Route::post('{challan}/reject', 'reject')->whereNumber('challan')->name('reject');
+                Route::post('{challan}/dispatch-info', 'dispatchInfo')->whereNumber('challan')->name('dispatch-info');
             });
 
         // Style Closing Summary — in the Manual Challan menu, typed by hand.

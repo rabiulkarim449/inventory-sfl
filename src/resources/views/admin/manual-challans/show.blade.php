@@ -68,6 +68,33 @@
                     </div>
                 @endcan
             @endif
+
+            {{-- Approved = locked, except these three: the vehicle and receiver are often known only at dispatch. --}}
+            @if($challan->isApproved())
+                @can($perm . '.edit')
+                    <div class="border rounded p-3 mt-3">
+                        <h6 class="mb-2">Vehicle / Receiver</h6>
+                        <form method="POST" action="{{ route('inventory.manual-challans.dispatch-info', [$type, $challan]) }}" class="row align-items-end">
+                            @csrf
+                            <div class="col-md-3 mb-2">
+                                <label class="small mb-1">Vehicle No</label>
+                                <input type="text" name="vehicle_no" class="form-control form-control-sm" maxlength="100" value="{{ old('vehicle_no', $challan->vehicle_no) }}">
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <label class="small mb-1">Receiver Name</label>
+                                <input type="text" name="receiver_name" class="form-control form-control-sm" maxlength="255" value="{{ old('receiver_name', $challan->receiver_name) }}">
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <label class="small mb-1">Receiver Contact</label>
+                                <input type="text" name="receiver_contact" class="form-control form-control-sm" maxlength="100" value="{{ old('receiver_contact', $challan->receiver_contact) }}">
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <button type="submit" class="btn btn-sm ui-act ui-act-save" title="Save"><i class="fa-solid fa-floppy-disk"></i> Save</button>
+                            </div>
+                        </form>
+                    </div>
+                @endcan
+            @endif
         </div>
     </div>
 </div>
