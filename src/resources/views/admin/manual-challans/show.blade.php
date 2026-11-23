@@ -20,6 +20,11 @@
                 @can($perm . '.print')
                     <a href="{{ route('inventory.manual-challans.print', [$type, $challan]) }}" target="_blank" class="btn btn-sm ui-act ui-act-print" title="Print"><i class="fa-solid fa-print"></i> Print</a>
                 @endcan
+                @unless($challan->status === 'rejected')
+                    @can($perm . '.edit')
+                        <button type="button" class="btn btn-sm ui-act ui-act-edit" data-toggle="modal" data-target="#mcDispatchModal" title="Vehicle / Receiver"><i class="fa-solid fa-truck"></i> Vehicle / Receiver</button>
+                    @endcan
+                @endunless
                 @if($challan->isPending())
                     @can($perm . '.edit')
                         <a href="{{ route('inventory.manual-challans.edit', [$type, $challan]) }}" class="btn btn-sm ui-act ui-act-edit" title="Edit"><i class="fa-solid fa-pen-to-square"></i> Edit</a>
@@ -69,33 +74,45 @@
                 @endcan
             @endif
 
-            {{-- Approved = locked, except these three: the vehicle and receiver are often known only at dispatch. --}}
-            @if($challan->isApproved())
-                @can($perm . '.edit')
-                    <div class="border rounded p-3 mt-3">
-                        <h6 class="mb-2">Vehicle / Receiver</h6>
-                        <form method="POST" action="{{ route('inventory.manual-challans.dispatch-info', [$type, $challan]) }}" class="row align-items-end">
-                            @csrf
-                            <div class="col-md-3 mb-2">
-                                <label class="small mb-1">Vehicle No</label>
-                                <input type="text" name="vehicle_no" class="form-control form-control-sm" maxlength="100" value="{{ old('vehicle_no', $challan->vehicle_no) }}">
-                            </div>
-                            <div class="col-md-3 mb-2">
-                                <label class="small mb-1">Receiver Name</label>
-                                <input type="text" name="receiver_name" class="form-control form-control-sm" maxlength="255" value="{{ old('receiver_name', $challan->receiver_name) }}">
-                            </div>
-                            <div class="col-md-3 mb-2">
-                                <label class="small mb-1">Receiver Contact</label>
-                                <input type="text" name="receiver_contact" class="form-control form-control-sm" maxlength="100" value="{{ old('receiver_contact', $challan->receiver_contact) }}">
-                            </div>
-                            <div class="col-md-3 mb-2">
-                                <button type="submit" class="btn btn-sm ui-act ui-act-save" title="Save"><i class="fa-solid fa-floppy-disk"></i> Save</button>
-                            </div>
-                        </form>
-                    </div>
-                @endcan
-            @endif
         </div>
     </div>
 </div>
+
+{{-- Vehicle / Receiver only — saved in any status but Rejected, approved challans included
+     (the vehicle and receiver are often known only at dispatch). Everything else stays as it is. --}}
+@unless($challan->status === 'rejected')
+    @can($perm . '.edit')
+        <div class="modal fade" id="mcDispatchModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form method="POST" action="{{ route('inventory.manual-challans.dispatch-info', [$type, $challan]) }}">
+                        @csrf
+                        <div class="modal-header">
+                            <h5 class="modal-title">Vehicle / Receiver — {{ $challan->challan_no }}</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group mb-2">
+                                <label class="small mb-1">Vehicle No</label>
+                                <input type="text" name="vehicle_no" class="form-control form-control-sm" maxlength="100" value="{{ old('vehicle_no', $challan->vehicle_no) }}">
+                            </div>
+                            <div class="form-group mb-2">
+                                <label class="small mb-1">Receiver Name</label>
+                                <input type="text" name="receiver_name" class="form-control form-control-sm" maxlength="255" value="{{ old('receiver_name', $challan->receiver_name) }}">
+                            </div>
+                            <div class="form-group mb-0">
+                                <label class="small mb-1">Receiver Contact</label>
+                                <input type="text" name="receiver_contact" class="form-control form-control-sm" maxlength="100" value="{{ old('receiver_contact', $challan->receiver_contact) }}">
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-sm ui-act ui-act-cancel" data-dismiss="modal" title="Cancel"><i class="fa-solid fa-ban"></i> Cancel</button>
+                            <button type="submit" class="btn btn-sm ui-act ui-act-save" title="Save"><i class="fa-solid fa-floppy-disk"></i> Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endcan
+@endunless
 @endsection

@@ -161,15 +161,15 @@ class ManualChallanController extends Controller
     }
 
     /**
-     * Vehicle No and Receiver Name / Contact on an approved challan — the only
-     * things that can still change once it is approved (they are often known
-     * only at dispatch). A pending challan uses the normal Edit.
+     * Vehicle No and Receiver Name / Contact only (the popup on the challan page).
+     * Works pending or approved — once approved these are the only things that
+     * can still change, as they are often known only at dispatch. Not when rejected.
      */
     public function dispatchInfo(Request $request, string $type, int $challan): RedirectResponse
     {
         $this->authorize($this->perm($type) . '.edit');
         $challan = $this->find($type, $challan);
-        if (! $challan->isApproved()) {
+        if ($challan->status === 'rejected') {
             return $this->locked($type, $challan);
         }
         $data = $request->validate([
