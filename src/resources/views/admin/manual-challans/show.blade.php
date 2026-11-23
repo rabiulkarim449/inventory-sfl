@@ -20,11 +20,11 @@
                 @can($perm . '.print')
                     <a href="{{ route('inventory.manual-challans.print', [$type, $challan]) }}" target="_blank" class="btn btn-sm ui-act ui-act-print" title="Print"><i class="fa-solid fa-print"></i> Print</a>
                 @endcan
-                @unless($challan->status === 'rejected')
+                @if($challan->isApproved())
                     @can($perm . '.edit')
                         <button type="button" class="btn btn-sm ui-act ui-act-edit" data-toggle="modal" data-target="#mcDispatchModal" title="Vehicle / Receiver"><i class="fa-solid fa-truck"></i> Vehicle / Receiver</button>
                     @endcan
-                @endunless
+                @endif
                 @if($challan->isPending())
                     @can($perm . '.edit')
                         <a href="{{ route('inventory.manual-challans.edit', [$type, $challan]) }}" class="btn btn-sm ui-act ui-act-edit" title="Edit"><i class="fa-solid fa-pen-to-square"></i> Edit</a>
@@ -78,9 +78,9 @@
     </div>
 </div>
 
-{{-- Vehicle / Receiver only — saved in any status but Rejected, approved challans included
+{{-- Vehicle / Receiver only, on an approved challan (a pending one has the full Edit)
      (the vehicle and receiver are often known only at dispatch). Everything else stays as it is. --}}
-@unless($challan->status === 'rejected')
+@if($challan->isApproved())
     @can($perm . '.edit')
         <div class="modal fade" id="mcDispatchModal" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog">
@@ -114,5 +114,5 @@
             </div>
         </div>
     @endcan
-@endunless
+@endif
 @endsection
