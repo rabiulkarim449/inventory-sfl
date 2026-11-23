@@ -33,7 +33,8 @@
     /* Receiver Name / Contact under the receiver's signature; blank = a line to write on. */
     .mc-sign .info { text-align: left; margin-top: 6px; font-size: 11px; }
     .mc-sign .info div { display: flex; margin-top: 4px; }
-    .mc-sign .info .k { flex-shrink: 0; font-weight: 600; margin-right: 4px; }
+    /* Same label width, so the name and the number start in one column. */
+    .mc-sign .info .k { flex-shrink: 0; width: 100px; font-weight: 600; margin-right: 4px; white-space: nowrap; }
     .mc-sign .info .v { flex: 1; border-bottom: 1px dotted #555; min-height: 14px; }
     .mc-blank { display: inline-block; min-width: 90px; border-bottom: 1px dotted #555; }
     /* On paper the signatures sit at the foot of the page; the tfoot spacer (repeated on every page) keeps the table from running under them. */
