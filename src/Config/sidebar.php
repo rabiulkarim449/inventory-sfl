@@ -116,6 +116,7 @@ return [
                         ['title' => 'FG Receive', 'icon' => 'fa-solid fa-box', 'icon_color' => 'text-success', 'permission' => 'inv_fg_receive', 'route' => "$base/fg-receives"],
                         ['title' => 'Shipment', 'icon' => 'fa-solid fa-ship', 'icon_color' => 'text-success', 'permission' => 'inv_shipment', 'route' => "$base/shipments"],
                         ['title' => 'Gate Pass', 'icon' => 'fa-solid fa-id-card', 'icon_color' => 'text-success', 'permission' => 'inv_gate_pass', 'route' => "$base/gate-passes"],
+                        ['title' => 'Closing Summary', 'icon' => 'fa-solid fa-clipboard-check', 'icon_color' => 'text-success', 'permission' => 'inv_fg_closing_summary', 'route' => "$base/fg-closing-summaries"],
                     ],
                 ],
                 [

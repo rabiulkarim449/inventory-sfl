@@ -186,6 +186,17 @@
         </div>
     @endcan
 
+    <div class="col-md-3 mb-3">
+        <label class="form-label">Closing Summary Row</label>
+        <select name="closing_summary_row" class="form-control form-control-sm inv-select2">
+            <option value="">— Not on the sheet —</option>
+            @foreach(\ME\SflInventory\Support\ClosingSummaryTrims::all() as $rowKey => $rowLabel)
+                <option value="{{ $rowKey }}" @selected(old('closing_summary_row', $item->closing_summary_row ?? '') === $rowKey)>{{ $rowLabel }}</option>
+            @endforeach
+        </select>
+        <div class="form-text">The trims line of the Finished Goods Closing Summary this item is counted on.</div>
+    </div>
+
     <div class="col-12 mb-3">
         <label class="form-label">Specification</label>
         <textarea name="specification" class="form-control form-control-sm" rows="1">{{ old('specification', $item->specification ?? '') }}</textarea>

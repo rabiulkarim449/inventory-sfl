@@ -175,6 +175,13 @@ Route::middleware($route['middleware'] ?? ['web', 'auth'])
         Route::get('closing-summaries/{closingSummary}/print', [\ME\SflInventory\Http\Controllers\ClosingSummaryController::class, 'print'])
             ->name('closing-summaries.print');
 
+        // Style Closing Summary — Finished Goods menu, filled by the system (one sheet per order + PO no).
+        Route::get('fg-closing-summaries', [\ME\SflInventory\Http\Controllers\FgClosingSummaryController::class, 'index'])->name('fg-closing-summaries.index');
+        Route::get('fg-closing-summaries/{orderPo}', [\ME\SflInventory\Http\Controllers\FgClosingSummaryController::class, 'show'])->whereNumber('orderPo')->name('fg-closing-summaries.show');
+        Route::get('fg-closing-summaries/{orderPo}/print', [\ME\SflInventory\Http\Controllers\FgClosingSummaryController::class, 'print'])->whereNumber('orderPo')->name('fg-closing-summaries.print');
+        Route::get('fg-closing-summaries/{orderPo}/edit', [\ME\SflInventory\Http\Controllers\FgClosingSummaryController::class, 'edit'])->whereNumber('orderPo')->name('fg-closing-summaries.edit');
+        Route::put('fg-closing-summaries/{orderPo}', [\ME\SflInventory\Http\Controllers\FgClosingSummaryController::class, 'update'])->whereNumber('orderPo')->name('fg-closing-summaries.update');
+
         // Internal Stock Transfer + Production Consumption
         Route::resource('transfers', InvStockTransferController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update', 'destroy']);
         Route::post('transfers/{transfer}/approve', [InvStockTransferController::class, 'approve'])->name('transfers.approve');

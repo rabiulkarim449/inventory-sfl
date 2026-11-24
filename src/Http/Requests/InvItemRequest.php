@@ -108,6 +108,7 @@ class InvItemRequest extends FormRequest
             'size_id'          => ['nullable', 'integer', 'exists:inv_sizes,id'],
             'specification'    => ['nullable', 'string'],
             'item_type'        => ['nullable', 'in:raw_material,wip,finished_good'],
+            'closing_summary_row' => ['nullable', 'in:' . implode(',', array_keys(\ME\SflInventory\Support\ClosingSummaryTrims::all()))],
             'minimum_stock'    => ['nullable', 'numeric', 'min:0'],
             'maximum_stock'    => ['nullable', 'numeric', 'min:0'],
             'opening_stock'    => [$isCreate ? 'nullable' : 'prohibited', 'numeric', 'min:0'],

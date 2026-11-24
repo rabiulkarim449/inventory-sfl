@@ -107,7 +107,7 @@ return [
             array_map(fn ($t) => ['label' => $t['menu'] . ' Challan', 'permissions' => $crud + ['approve' => 'Approve / Reject', 'print' => 'Print']], array_values(\ME\SflInventory\Support\ManualChallanTypes::all()))
         ),
         'inv_closing_summary' => [
-            'label' => 'Closing Summary',
+            'label' => 'Manual Closing Summary',
             'permissions' => $crud + ['print' => 'Print'],
         ],
         'inv_transfer' => [
@@ -121,6 +121,10 @@ return [
         'inv_fg_receive' => [
             'label' => 'Finished Goods Receive',
             'permissions' => $crud + ['print' => 'Print', 'export' => 'Export'],
+        ],
+        'inv_fg_closing_summary' => [
+            'label' => 'Finished Goods Closing Summary',
+            'permissions' => ['list' => 'List', 'view' => 'View', 'edit' => 'Edit', 'print' => 'Print', 'all' => 'All'],
         ],
         'inv_gate_pass' => [
             'label' => 'Gate Pass',
